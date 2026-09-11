@@ -1,0 +1,14 @@
+import { chromium } from "playwright";
+const b = await chromium.launch();
+const p = await b.newPage({ viewport: { width: 1500, height: 1000 } });
+const errs=[]; p.on("pageerror",e=>errs.push(e.message));
+await p.goto("http://localhost:3111/login");
+await p.fill("#email","admin@nova.test"); await p.fill("#password","password123");
+await p.click(".btn.primary"); await p.waitForURL("**/grading**"); await p.waitForTimeout(1500);
+console.log("grading:", (await p.textContent("h1")).trim(), "|", (await p.textContent(".pill")).trim());
+await p.goto("http://localhost:3111/rankings"); await p.waitForTimeout(900);
+console.log("rankings hero:", (await p.textContent(".hero-num")).trim(), "| year sliders:", await p.locator(".yc-row").count());
+await p.goto("http://localhost:3111/admin"); await p.waitForTimeout(700);
+console.log("admin grader rows:", await p.locator("table.tbl tbody tr").count());
+console.log("errors:", errs);
+await b.close();
