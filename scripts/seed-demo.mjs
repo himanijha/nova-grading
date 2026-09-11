@@ -38,7 +38,7 @@ const pick = (arr) => arr[Math.floor(rnd() * arr.length)];
 
 const FIRST = "Avery Jordan Maya Alex Rin Noor Sam Kai Iris Theo Luca Nia Ezra Priya Owen Zoe Malik Hana Diego Sena Rowan Amara Felix June".split(" ");
 const LAST = "Chen Doe Kim Patel Okafor Rivera Nakamura Ahmed Silva Novak Haddad Torres Lin Byrne Adeyemi Castro Ivanov Mensah Park Reyes".split(" ");
-const YEARS = ["2026", "2027", "2028", "2029"];
+const YEARS = ["2027", "2028", "2028 (junior transfer)", "2029", "2030"];
 const MAJORS = ["Computer Science", "Design | Media Arts", "Cognitive Science", "Electrical Engineering", "Statistics", "Sociology"];
 const ROLES = [
   ["Developer", "DEVELOPER"],

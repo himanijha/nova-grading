@@ -23,6 +23,13 @@ automatically; the mapping is shown so you can correct anything before
 importing. Re-importing the same export updates existing applicants rather than
 duplicating them (matched on email + submission timestamp).
 
+**Graduation year** — the form's year options include a junior-transfer choice
+("2028 (junior transfer)"). Transfers stay a separate cohort throughout: they
+get their own entry in the year filter and their own cutoff slider on Rankings,
+rather than being counted as part of that year's class. Casing and punctuation
+variants of the answer are normalised on import, so re-exports of the form
+group cleanly.
+
 **Grading** — the left column lists applicants sorted by fewest reviews first,
 so the least-covered applications rise to the top. You can also sort by most
 reviews, most recent, or name, filter to Developers / Designers / Both, and

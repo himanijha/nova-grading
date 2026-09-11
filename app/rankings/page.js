@@ -1,6 +1,7 @@
 import { redirect } from "next/navigation";
 import { getCurrentGrader } from "@/lib/auth";
 import { prisma } from "@/lib/db";
+import { normalizeGradYear } from "@/lib/mapping";
 import Nav from "../Nav";
 import RankingsClient from "./RankingsClient";
 
@@ -38,7 +39,7 @@ export default async function RankingsPage() {
     return {
       id: a.id,
       fullName: a.fullName,
-      gradYear: a.gradYear?.trim() || "Unknown",
+      gradYear: normalizeGradYear(a.gradYear) || "Unknown",
       majors: a.majors,
       roleCategory: a.roleCategory,
       reviewCount: a.grades.length,

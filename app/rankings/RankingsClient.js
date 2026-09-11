@@ -2,6 +2,7 @@
 
 import { Fragment, useMemo, useState } from "react";
 import Link from "next/link";
+import { compareGradYears, gradYearParts } from "@/lib/mapping";
 
 const ROLE_LABEL = {
   DEVELOPER: "Developer",
@@ -42,9 +43,13 @@ function Breakdown({ title, rows, total }) {
 
 /** One year's cutoff slider, with the count it currently admits. */
 function YearCutoff({ year, cutoff, above, total, onChange }) {
+  const { year: yearLabel, transfer } = gradYearParts(year);
   return (
     <div className="yc-row">
-      <div className="yc-year">{year}</div>
+      <div className="yc-year">
+        {yearLabel}
+        {transfer && <span className="yc-tag">transfer</span>}
+      </div>
       <div className="yc-slider">
         <input
           type="range"
@@ -72,17 +77,11 @@ export default function RankingsClient({ applicants }) {
   const [roleFilter, setRoleFilter] = useState("all");
   const [yearFilter, setYearFilter] = useState("all");
 
-  // Every graduation year present, oldest first; unknowns last.
+  // Every graduation year present, oldest first, each class immediately
+  // followed by its junior transfers; Other/Unknown last.
   const allYears = useMemo(() => {
     const set = new Set(applicants.map((a) => a.gradYear));
-    return [...set].sort((a, b) => {
-      const na = Number(a);
-      const nb = Number(b);
-      if (!isNaN(na) && !isNaN(nb)) return na - nb;
-      if (!isNaN(na)) return -1;
-      if (!isNaN(nb)) return 1;
-      return a.localeCompare(b);
-    });
+    return [...set].sort(compareGradYears);
   }, [applicants]);
 
   // Each year carries its own cutoff, so you can admit a different number per class.

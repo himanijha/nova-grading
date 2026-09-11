@@ -388,7 +388,7 @@ input[type="range"] {
 .yc-head,
 .yc-row {
   display: grid;
-  grid-template-columns: 70px minmax(120px, 1fr) 60px 132px;
+  grid-template-columns: 96px minmax(120px, 1fr) 60px 132px;
   gap: 14px;
   align-items: center;
 }
@@ -401,6 +401,15 @@ input[type="range"] {
 }
 .yc-row { padding: 5px 0; }
 .yc-year { font-weight: 600; font-variant-numeric: tabular-nums; }
+/* Junior transfers are their own cohort, tagged so the year stays scannable. */
+.yc-tag {
+  display: block;
+  font-weight: 500;
+  font-size: 10px;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
 .yc-slider input[type="range"] { margin: 0; display: block; }
 .yc-cut {
   text-align: right;
@@ -414,7 +423,7 @@ input[type="range"] {
 @media (max-width: 700px) {
   .yc-head { display: none; }
   .yc-row {
-    grid-template-columns: 56px minmax(0, 1fr);
+    grid-template-columns: 76px minmax(0, 1fr);
     row-gap: 4px;
   }
   .yc-cut, .yc-count { text-align: left; grid-column: 2; }

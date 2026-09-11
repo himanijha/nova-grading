@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import crypto from "crypto";
 import { prisma } from "@/lib/db";
 import { getCurrentGrader } from "@/lib/auth";
-import { roleCategory, parseTimestamp } from "@/lib/mapping";
+import { roleCategory, parseTimestamp, normalizeGradYear } from "@/lib/mapping";
 
 const TEXT_FIELDS = [
   "contactEmail",
@@ -73,6 +73,8 @@ export async function POST(req) {
     };
     for (const f of TEXT_FIELDS) data[f] = get(row, f);
     data.roleCategory = roleCategory(data.roleRaw);
+    // "2028 (Junior Transfer)" and friends collapse to one canonical cohort.
+    data.gradYear = normalizeGradYear(data.gradYear);
 
     const existing = await prisma.applicant.findUnique({ where: { dedupeKey } });
     if (existing) {
