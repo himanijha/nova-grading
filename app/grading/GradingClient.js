@@ -87,6 +87,17 @@ export default function GradingClient({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [search]);
 
+  // Pin the selected applicant into the URL. Without this, selection falls back
+  // to "first in the list" — and since the list is sorted by fewest reviews,
+  // saving a grade re-sorts it and silently moves you to a different applicant.
+  useEffect(() => {
+    if (params.get("id") || !applicant) return;
+    const next = new URLSearchParams(params.toString());
+    next.set("id", applicant.id);
+    router.replace(`/grading?${next.toString()}`, { scroll: false });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [applicant?.id]);
+
   function setParam(updates) {
     const next = new URLSearchParams(params.toString());
     for (const [k, v] of Object.entries(updates)) {
