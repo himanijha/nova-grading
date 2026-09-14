@@ -5,15 +5,94 @@ Form CSV, then grade applicants against a four-part rubric.
 
 ## Setup
 
+The app runs on **PostgreSQL**. You need a database before anything else — pick
+one of the two options below, then continue to "Then, in both cases".
+
+### Option A — a hosted database (what you want for real use)
+
+Free tiers are enough for this; a full application cycle is a few megabytes.
+
+1. Make an account at **neon.com** (or supabase.com) and create a project.
+   Pick the region closest to campus.
+2. Copy the **connection string** it shows you. It looks like:
+   `postgresql://user:password@ep-something.us-west-2.aws.neon.tech/neondb?sslmode=require`
+3. Put it in `.env` as `DATABASE_URL` (see `.env.example`). Keep `?sslmode=require`.
+
+Do not commit `.env` — it is already in `.gitignore`.
+
+### Option B — Postgres on your laptop (for development)
+
+Requires Docker Desktop:
+
+```bash
+docker compose up -d      # starts Postgres on port 55432
+```
+
+The default `DATABASE_URL` in `.env.example` already points at it.
+
+### Then, in both cases
+
 ```bash
 npm install
-npx prisma db push                                  # create the SQLite database
+cp .env.example .env                                # then paste your DATABASE_URL
+npx prisma migrate deploy                           # create the tables
 npm run seed -- "Your Name" you@ucla.edu yourpass    # create the first admin
 npm run dev                                          # http://localhost:3000
 ```
 
-Edit `.env` before deploying anywhere real — `SESSION_SECRET` must be a long
-random string, and `DATABASE_URL` points at the SQLite file.
+Also set `SESSION_SECRET` in `.env` to a long random string before deploying:
+
+```bash
+node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"
+```
+
+If you change `prisma/schema.prisma`, run `npx prisma migrate dev --name what-changed`
+to create a migration, and `npx prisma migrate deploy` to apply it elsewhere.
+
+## Backups and moving data
+
+Applicant data is recoverable — it comes from the Google Form, so re-importing
+the CSV rebuilds it. **The grades are the only irreplaceable thing here**, so
+they are what these scripts protect.
+
+```bash
+node scripts/export-data.mjs                    # dump a SQLite database to backups/*.json
+npm run import backups/export-....json          # load a dump into the current database
+npm run import backups/export-....json --grades-only
+```
+
+Grades are stored in the dump by grader email + applicant key rather than by row
+id, so they reattach correctly even if the applicants were recreated by
+re-importing the Form CSV. Both scripts upsert, so re-running them is safe.
+
+The export reads a SQLite file directly and exists mainly for the one-time move
+off SQLite. For ongoing backups on a hosted database, use the provider's own
+snapshots — that is most of why you are paying them.
+
+## Trying it with fake data
+
+```bash
+npm run seed:demo              # 24 fake applicants, 3 fake graders, random grades
+npm run seed:demo -- 60        # a specific number of applicants
+npm run seed:demo -- 24 wipe   # remove the previous demo data first
+```
+
+Demo applicants use `@demo.ucla.edu` emails and demo graders use `@nova.demo`,
+so `wipe` only removes generated data and never touches real applications.
+
+The written responses come from `scripts/demo-content.mjs` — eight full fake
+applications at varying quality, tagged with a strength the seeder uses to
+cluster the generated grades. That means the Rankings page shows a believable
+spread rather than noise: the applications that read well actually rank high.
+Edit that file to change what graders see. A few applicants are left ungraded on
+purpose so the "no reviews yet" states are visible. To clear the demo data without adding more:
+
+```bash
+npm run seed:demo -- 0 wipe
+```
+
+There is also `sample/sample-responses.csv` — three fake applications in the real
+Google Form export format, for testing the Import page itself.
 
 ## Using it
 
@@ -61,6 +140,8 @@ the link is currently returned.
 ## Layout
 
 - `prisma/schema.prisma` — Grader, Applicant, Grade, PasswordResetToken
+- `prisma/migrations/` — schema history; apply with `prisma migrate deploy`
+- `scripts/export-data.mjs`, `scripts/import-data.mjs` — backup / restore
 - `lib/mapping.js` — CSV header matching, role categorising, Drive URL handling
 - `app/grading/` — the grading screen
 - `app/import/` — CSV upload and column mapping

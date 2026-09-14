@@ -6,8 +6,12 @@
     "dev": "next dev",
     "build": "prisma generate && next build",
     "start": "next start",
-    "db:push": "prisma db push",
-    "seed": "node scripts/seed.mjs"
+    "seed": "node scripts/seed.mjs",
+    "seed:demo": "node scripts/seed-demo.mjs",
+    "db:migrate": "prisma migrate deploy",
+    "db:migrate:dev": "prisma migrate dev",
+    "export": "node scripts/export-data.mjs",
+    "import": "node scripts/import-data.mjs"
   },
   "dependencies": {
     "@prisma/client": "^6.2.1",
