@@ -5,6 +5,7 @@
 import { PrismaClient } from "@prisma/client";
 import bcrypt from "bcryptjs";
 import crypto from "crypto";
+import { PROFILES } from "./demo-content.mjs";
 
 const prisma = new PrismaClient();
 
@@ -40,11 +41,11 @@ const FIRST = "Avery Jordan Maya Alex Rin Noor Sam Kai Iris Theo Luca Nia Ezra P
 const LAST = "Chen Doe Kim Patel Okafor Rivera Nakamura Ahmed Silva Novak Haddad Torres Lin Byrne Adeyemi Castro Ivanov Mensah Park Reyes".split(" ");
 const YEARS = ["2027", "2028", "2028 (junior transfer)", "2029", "2030"];
 const MAJORS = ["Computer Science", "Design | Media Arts", "Cognitive Science", "Electrical Engineering", "Statistics", "Sociology"];
-const ROLES = [
-  ["Developer", "DEVELOPER"],
-  ["Designer", "DESIGNER"],
-  ["Both — I'd like to split between development and design", "BOTH"],
-];
+const ROLE_RAW = {
+  DEVELOPER: "Developer",
+  DESIGNER: "Designer",
+  BOTH: "Both — I'd like to split between development and design",
+};
 
 for (const [name, email] of DEMO_GRADERS) {
   await prisma.grader.upsert({
@@ -54,11 +55,17 @@ for (const [name, email] of DEMO_GRADERS) {
   });
 }
 
+// Each applicant draws a written profile; `strength` is remembered so the
+// grades below line up with how the responses actually read.
+const strengthByEmail = new Map();
+
 for (let i = 0; i < count; i++) {
   const name = `${pick(FIRST)} ${pick(LAST)}`;
   const email = `demo${i}${DEMO_DOMAIN}`;
-  const [roleRaw, roleCategory] = pick(ROLES);
+  const profile = PROFILES[i % PROFILES.length];
   const dedupeKey = crypto.createHash("sha256").update(email).digest("hex");
+
+  strengthByEmail.set(email, profile.strength);
 
   await prisma.applicant.upsert({
     where: { dedupeKey },
@@ -71,11 +78,14 @@ for (let i = 0; i < count; i++) {
       gradYear: pick(YEARS),
       majors: pick(MAJORS),
       minors: rnd() < 0.4 ? pick(MAJORS) : null,
-      roleRaw,
-      roleCategory,
-      qLookingForward: "Sample response — this is demo data, not a real application.",
-      qInitiative: "Sample response — this is demo data, not a real application.",
-      qCommunity: "Sample response — this is demo data, not a real application.",
+      resumeUrl: `https://drive.google.com/file/d/demo${i}FakeDriveFileId000000000/view`,
+      roleRaw: ROLE_RAW[profile.role],
+      roleCategory: profile.role,
+      qLookingForward: profile.lookingForward,
+      qInitiative: profile.initiative,
+      qCommunity: profile.community,
+      links: profile.links || null,
+      anythingElse: profile.anythingElse || null,
     },
     update: {},
   });
@@ -86,11 +96,15 @@ const graders = await prisma.grader.findMany({ where: { email: { endsWith: "@nov
 const applicants = await prisma.applicant.findMany({ where: { uclaEmail: { endsWith: DEMO_DOMAIN } } });
 
 for (const a of applicants) {
-  const n = Math.floor(rnd() * 4); // 0-3 reviewers, so some stay ungraded
+  // Mostly 1-3 reviewers; a few are left ungraded on purpose so the
+  // "no reviews yet" states are visible.
+  const n = rnd() < 0.15 ? 0 : 1 + Math.floor(rnd() * 3);
   const shuffled = [...graders].sort(() => rnd() - 0.5).slice(0, n);
+  const base = strengthByEmail.get(a.uclaEmail) ?? 3;
   for (const g of shuffled) {
-    const base = 2 + Math.floor(rnd() * 3);
-    const s = () => Math.max(1, Math.min(5, base + (rnd() < 0.4 ? 1 : 0) - (rnd() < 0.2 ? 1 : 0)));
+    // Scores hover around the profile's strength, +/- a point of grader disagreement.
+    const s = () =>
+      Math.max(1, Math.min(5, base + (rnd() < 0.25 ? 1 : 0) - (rnd() < 0.25 ? 1 : 0)));
     await prisma.grade.upsert({
       where: { applicantId_graderId: { applicantId: a.id, graderId: g.id } },
       create: {

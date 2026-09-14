@@ -182,4 +182,4 @@ the link is currently returned.
 - `app/grading/` — the grading screen
 - `app/import/` — CSV upload and column mapping
 - `app/admin/` — grader management
-- `sample/sample-responses.csv` — eight fake applications for trying it out
+- `sample/sample-responses.csv` — three fake applications for trying it out
