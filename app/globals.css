@@ -11,6 +11,7 @@
   --good-soft: #dcfce7;
   --warn: #b45309;
   --danger: #dc2626;
+  --danger-soft: #fee2e2;
   --radius: 12px;
 }
 
@@ -430,6 +431,70 @@ input[type="range"] {
   }
   .yc-cut, .yc-count { text-align: left; grid-column: 2; }
 }
+
+/* Auto accept / auto reject ------------------------------------------------
+   An override of the rubric, so it reads as a decision rather than a score.
+   Deliberately quiet: these are rare, and the table still ranks by number. */
+.auto-block { border-top: 1px solid var(--line); padding-top: 12px; }
+.auto-row { display: flex; gap: 8px; flex-wrap: wrap; }
+.btn.auto { flex: 1 1 0; min-width: 120px; justify-content: center; }
+.btn.auto.accept.on {
+  background: var(--good-soft);
+  border-color: var(--good);
+  color: var(--good);
+  font-weight: 600;
+}
+.btn.auto.reject.on {
+  background: var(--danger-soft);
+  border-color: var(--danger);
+  color: var(--danger);
+  font-weight: 600;
+}
+.req { color: var(--danger); font-weight: 500; }
+textarea.inp.needed { border-color: var(--danger); }
+
+.dtag {
+  display: inline-block;
+  margin-right: 6px;
+  padding: 1px 6px;
+  border-radius: 999px;
+  border: 1px solid transparent;
+  font-size: 10px;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  vertical-align: middle;
+  white-space: nowrap;
+}
+.dtag.accept { background: var(--good-soft); color: var(--good); }
+.dtag.reject { background: var(--danger-soft); color: var(--danger); }
+.dtag.clickable { cursor: pointer; font-family: inherit; }
+.dtag.clickable:hover { border-color: currentColor; }
+
+.note-row td { background: var(--bg); font-size: 13px; }
+.note-line {
+  display: flex;
+  gap: 8px;
+  align-items: baseline;
+  padding: 3px 0;
+  flex-wrap: wrap;
+}
+.note-line span:last-child { color: var(--muted); }
+
+/* A decision beats the score, so the average stops looking authoritative. */
+.rank-table .overridden {
+  font-weight: 400;
+  color: var(--muted);
+  text-decoration: line-through;
+  text-decoration-color: var(--line);
+}
+/* One accept and one reject on the same person: nothing is overridden until
+   a human settles it, so it reads as a warning rather than a decision. */
+.dtag.conflict {
+  background: #fdf0dc;
+  color: var(--warn);
+  border-color: var(--warn);
+}
+
 /* Review coverage strip ----------------------------------------------------
    Spans the grading layout above the three columns. Answers one question at a
    glance: how far is the whole pile from one, two and three reviews each. */

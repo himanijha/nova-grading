@@ -359,6 +359,7 @@ function ScoringPanel({ grader, applicant, myGrade, list, onNavigate }) {
   });
   const [msg, setMsg] = useState("");
   const [busy, setBusy] = useState(false);
+  const [autoDecision, setAutoDecision] = useState(myGrade?.autoDecision || null);
   const msgTimer = useRef(null);
 
   useEffect(() => () => clearTimeout(msgTimer.current), []);
@@ -374,6 +375,20 @@ function ScoringPanel({ grader, applicant, myGrade, list, onNavigate }) {
 
   const complete = CRITERIA.every((c) => scores[c.key] >= 1);
 
+  // Auto accept/reject is an override: it fills the whole rubric with the
+  // extreme score. Toggling it off clears the scores again rather than leaving
+  // a wall of 5s or 1s behind that looks like someone actually graded it.
+  function toggleAuto(decision) {
+    if (autoDecision === decision) {
+      setAutoDecision(null);
+      setScores(blank);
+      return;
+    }
+    setAutoDecision(decision);
+    const n = decision === "ACCEPT" ? 5 : 1;
+    setScores({ technical: n, thoughtfulness: n, initiative: n, communityFit: n });
+  }
+
   function flash(text) {
     setMsg(text);
     clearTimeout(msgTimer.current);
@@ -382,11 +397,16 @@ function ScoringPanel({ grader, applicant, myGrade, list, onNavigate }) {
 
   async function save(advance) {
     if (!complete) return flash("Score all four criteria before saving.");
+    if (autoDecision && !notes.overallNote.trim()) {
+      return flash(
+        `Explain this auto ${autoDecision === "ACCEPT" ? "accept" : "reject"} in the notes.`
+      );
+    }
     setBusy(true);
     const res = await fetch("/api/grades", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ applicantId: applicant.id, ...scores, ...notes }),
+      body: JSON.stringify({ applicantId: applicant.id, ...scores, ...notes, autoDecision }),
     });
     setBusy(false);
 
@@ -444,13 +464,46 @@ function ScoringPanel({ grader, applicant, myGrade, list, onNavigate }) {
       ))}
 
       <div className="criterion">
-        <div className="criterion-name">Overall notes</div>
+        <div className="criterion-name">
+          Overall notes
+          {autoDecision && <span className="req"> — required</span>}
+        </div>
         <textarea
-          className="inp"
-          placeholder="Anything the rest of the team should know"
+          className={`inp${autoDecision && !notes.overallNote.trim() ? " needed" : ""}`}
+          placeholder={
+            autoDecision
+              ? `Why is this an auto ${autoDecision === "ACCEPT" ? "accept" : "reject"}?`
+              : "Anything the rest of the team should know"
+          }
           value={notes.overallNote}
           onChange={(e) => setNotes((n) => ({ ...n, overallNote: e.target.value }))}
         />
+      </div>
+
+      <div className="criterion auto-block">
+        <div className="criterion-name">Auto decision</div>
+        <div className="criterion-desc">
+          For the rare application that does not need scoring. Fills the rubric
+          with 20/20 or 4/20 and asks you to say why.
+        </div>
+        <div className="auto-row">
+          <button
+            type="button"
+            className={`btn auto accept${autoDecision === "ACCEPT" ? " on" : ""}`}
+            aria-pressed={autoDecision === "ACCEPT"}
+            onClick={() => toggleAuto("ACCEPT")}
+          >
+            Auto accept
+          </button>
+          <button
+            type="button"
+            className={`btn auto reject${autoDecision === "REJECT" ? " on" : ""}`}
+            aria-pressed={autoDecision === "REJECT"}
+            onClick={() => toggleAuto("REJECT")}
+          >
+            Auto reject
+          </button>
+        </div>
       </div>
 
       <div style={{ fontSize: 13, color: "var(--muted)" }}>
@@ -481,6 +534,11 @@ function ScoringPanel({ grader, applicant, myGrade, list, onNavigate }) {
               {g.graderId === grader.id ? " (you)" : ""}
             </span>
             <span className="grader-scores">
+              {g.autoDecision && (
+                <span className={`dtag ${g.autoDecision.toLowerCase()}`}>
+                  {g.autoDecision === "ACCEPT" ? "auto accept" : "auto reject"}
+                </span>
+              )}
               {g.technical}/{g.thoughtfulness}/{g.initiative}/{g.communityFit} ·{" "}
               {g.technical + g.thoughtfulness + g.initiative + g.communityFit}
             </span>

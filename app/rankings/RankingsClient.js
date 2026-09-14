@@ -73,6 +73,7 @@ function YearCutoff({ year, cutoff, above, total, onChange }) {
 }
 
 export default function RankingsClient({ applicants }) {
+  const [openNotes, setOpenNotes] = useState(null);
   const [minReviews, setMinReviews] = useState(1);
   const [roleFilter, setRoleFilter] = useState("all");
   const [yearFilter, setYearFilter] = useState("all");
@@ -96,7 +97,9 @@ export default function RankingsClient({ applicants }) {
       applicants.filter(
         (a) =>
           a.average !== null &&
-          a.reviewCount >= minReviews &&
+          // An overridden applicant is decided, so no further reviews are
+          // wanted — don't hide them behind the minimum-reviews filter.
+          (a.reviewCount >= minReviews || a.override) &&
           (roleFilter === "all" || a.roleCategory === roleFilter) &&
           (yearFilter === "all" || a.gradYear === yearFilter)
       ),
@@ -110,8 +113,13 @@ export default function RankingsClient({ applicants }) {
       (yearFilter === "all" || a.gradYear === yearFilter)
   ).length;
 
-  // An applicant clears the bar set for their own graduation year.
-  const isAbove = (a) => a.average >= cutoffFor(a.gradYear);
+  // An applicant clears the bar set for their own graduation year — unless a
+  // grader has overridden the decision, which wins over the score.
+  const isAbove = (a) => {
+    if (a.override === "ACCEPT") return true;
+    if (a.override === "REJECT") return false;
+    return a.average >= cutoffFor(a.gradYear);
+  };
   const above = graded.filter(isAbove);
 
   const visibleYears = yearFilter === "all" ? allYears : [yearFilter];
@@ -308,11 +316,30 @@ export default function RankingsClient({ applicants }) {
                       <td className="num">{i + 1}</td>
                       <td className="rank-name">
                         <Link href={`/grading?id=${a.id}`}>{a.fullName}</Link>
+                        {a.override && (
+                          <button
+                            type="button"
+                            className={`dtag ${a.override.toLowerCase()} clickable`}
+                            aria-expanded={openNotes === a.id}
+                            title="Show why"
+                            onClick={() =>
+                              setOpenNotes(openNotes === a.id ? null : a.id)
+                            }
+                          >
+                            {a.override === "ACCEPT"
+                              ? "auto accept"
+                              : a.override === "REJECT"
+                              ? "auto reject"
+                              : "conflict"}
+                          </button>
+                        )}
                       </td>
                       <td>{ROLE_LABEL[a.roleCategory]}</td>
                       <td>{a.gradYear}</td>
                       <td className="num">
-                        <strong>{a.average.toFixed(2)}</strong>
+                        <strong className={a.override && a.override !== "CONFLICT" ? "overridden" : ""}>
+                          {a.average.toFixed(2)}
+                        </strong>
                       </td>
                       {!singleYear && (
                         <td className="num" style={{ color: "var(--muted)" }}>
@@ -325,6 +352,21 @@ export default function RankingsClient({ applicants }) {
                       <td className="num">{a.criteria.communityFit.toFixed(1)}</td>
                       <td className="num">{a.reviewCount}</td>
                     </tr>
+                    {openNotes === a.id && a.autoDecisions.length > 0 && (
+                      <tr className="note-row">
+                        <td colSpan={cols}>
+                          {a.autoDecisions.map((d, n) => (
+                            <div className="note-line" key={n}>
+                              <span className={`dtag ${d.decision.toLowerCase()}`}>
+                                {d.decision === "ACCEPT" ? "auto accept" : "auto reject"}
+                              </span>
+                              <strong>{d.graderName}</strong>
+                              <span>{d.note || "No reason given."}</span>
+                            </div>
+                          ))}
+                        </td>
+                      </tr>
+                    )}
                   </Fragment>
                 );
               })}

@@ -80,6 +80,11 @@ model Grade {
   communityFitNote   String?
   overallNote        String?
 
+  // A deliberate override rather than a scored read: ACCEPT forces every
+  // criterion to 5, REJECT forces every criterion to 1. Whoever sets one must
+  // explain it in overallNote, and the reason is readable from Rankings.
+  autoDecision       String?  // ACCEPT | REJECT
+
   createdAt      DateTime @default(now())
   updatedAt      DateTime @updatedAt
 

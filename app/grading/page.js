@@ -109,6 +109,7 @@ export default async function GradingPage({ searchParams }) {
           initiativeNote: g.initiativeNote,
           communityFitNote: g.communityFitNote,
           overallNote: g.overallNote,
+          autoDecision: g.autoDecision,
           updatedAt: g.updatedAt.toISOString(),
         })),
       };
