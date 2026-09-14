@@ -25,6 +25,7 @@ export default function Nav({ grader }) {
         NOVA
       </Link>
       <div className="nav-links">
+        {link("/rankings", "Rankings")}
         {link("/grading", "Grading")}
         {link("/import", "Import CSV")}
         {grader?.isAdmin && link("/admin", "Admin")}

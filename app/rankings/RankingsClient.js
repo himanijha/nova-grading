@@ -2,7 +2,7 @@
 
 import { Fragment, useMemo, useState } from "react";
 import Link from "next/link";
-import { compareGradYears, gradYearParts } from "@/lib/mapping";
+import { compareGradYears, gradYearParts, GRAD_YEAR_OPTIONS } from "@/lib/mapping";
 
 const ROLE_LABEL = {
   DEVELOPER: "Developer",
@@ -85,6 +85,14 @@ export default function RankingsClient({ applicants }) {
     return [...set].sort(compareGradYears);
   }, [applicants]);
 
+  // The filter offers every option the form asks about, even ones nobody has
+  // submitted yet — otherwise a cohort with no applicants (a new transfer
+  // intake, say) looks like it is missing from the app rather than empty.
+  const filterYears = useMemo(() => {
+    const set = new Set([...GRAD_YEAR_OPTIONS, ...allYears]);
+    return [...set].sort(compareGradYears);
+  }, [allYears]);
+
   // Each year carries its own cutoff, so you can admit a different number per class.
   const [cutoffs, setCutoffs] = useState(() =>
     Object.fromEntries(allYears.map((y) => [y, DEFAULT_CUTOFF]))
@@ -165,7 +173,7 @@ export default function RankingsClient({ applicants }) {
             onChange={(e) => setYearFilter(e.target.value)}
           >
             <option value="all">All years</option>
-            {allYears.map((y) => (
+            {filterYears.map((y) => (
               <option key={y} value={y}>
                 {y}
               </option>
@@ -206,7 +214,7 @@ export default function RankingsClient({ applicants }) {
       </div>
 
       <section className="card">
-        <div className="cutoff-grid">
+        <div className={`cutoff-grid${singleYear ? " two-up" : ""}`}>
           <div>
             <div className="bd-title">
               {singleYear ? `Above cutoff — ${yearFilter}` : "Above cutoff — all years"}
@@ -226,11 +234,14 @@ export default function RankingsClient({ applicants }) {
           </div>
 
           <Breakdown title="Above cutoff by role" rows={roleRows} total={above.length} />
-          <Breakdown
-            title="Above cutoff by graduation year"
-            rows={yearRows}
-            total={above.length}
-          />
+          {/* The year breakdown is a single trivial row when one year is selected. */}
+          {!singleYear && (
+            <Breakdown
+              title="Above cutoff by graduation year"
+              rows={yearRows}
+              total={above.length}
+            />
+          )}
         </div>
 
         <div className="yc-block">

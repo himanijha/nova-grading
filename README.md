@@ -102,6 +102,26 @@ automatically; the mapping is shown so you can correct anything before
 importing. Re-importing the same export updates existing applicants rather than
 duplicating them (matched on email + submission timestamp).
 
+**Rankings** — the first page in the nav. Applicants are ranked by the average
+of their graders' total scores (out of 20), highest first; ties break toward the
+applicant with more reviews.
+
+**Each graduation year has its own cutoff**, since you'll usually admit a
+different number from each class. The cutoff card lists one slider per year with
+the count it currently admits ("4 of 6 · 67%"), so you can dial each year to the
+number of spots you have for it. An applicant is measured against the cutoff for
+*their* year, and the headline count is the total admitted across all years.
+
+Three filters sit above: **graduation year** (pick a year to rank only that
+class, with a marker showing where its cutoff falls in the list), **role**, and a
+**minimum review count** so you can compare only applicants with enough coverage.
+Cutoffs are kept per year as you switch between them, and "Reset all" puts them
+back to 14. Any name links straight into the grading view. Applicants with no
+reviews yet are excluded and counted separately.
+
+Cutoffs live in the page while you're using it — they are a what-if tool, not a
+saved decision, so a reload starts fresh at 14.
+
 **Graduation year** — the form's year options include a junior-transfer choice
 ("2028 (junior transfer)"). Transfers stay a separate cohort throughout: they
 get their own entry in the year filter and their own cutoff slider on Rankings,
@@ -143,6 +163,7 @@ the link is currently returned.
 - `prisma/migrations/` — schema history; apply with `prisma migrate deploy`
 - `scripts/export-data.mjs`, `scripts/import-data.mjs` — backup / restore
 - `lib/mapping.js` — CSV header matching, role categorising, Drive URL handling
+- `app/rankings/` — the ranking + cutoff screen
 - `app/grading/` — the grading screen
 - `app/import/` — CSV upload and column mapping
 - `app/admin/` — grader management

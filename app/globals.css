@@ -295,8 +295,11 @@ table.tbl th { color: var(--muted); font-weight: 600; font-size: 12px; text-tran
   gap: 28px;
   align-items: start;
 }
+.cutoff-grid.two-up {
+  grid-template-columns: minmax(0, 1.1fr) minmax(0, 1fr);
+}
 @media (max-width: 900px) {
-  .cutoff-grid { grid-template-columns: 1fr; }
+  .cutoff-grid, .cutoff-grid.two-up { grid-template-columns: 1fr; }
 }
 
 .hero-num {
@@ -337,12 +340,14 @@ input[type="range"] {
 }
 .bd-label { color: var(--ink); }
 .bd-track {
+  display: block;
   background: #eeedf3;
   border-radius: 3px;
   height: 10px;
   overflow: hidden;
 }
 .bd-fill {
+  display: block;
   height: 100%;
   background: var(--accent);
   border-radius: 0 3px 3px 0;
