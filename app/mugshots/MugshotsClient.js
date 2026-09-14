@@ -4,6 +4,8 @@ import { useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { RATINGS, ratingMeta } from "@/lib/ratings";
 
+import { MAX_UPLOAD_BYTES, MAX_UPLOAD_LABEL } from "@/lib/upload";
+
 const MAX_RESULTS = 40;
 
 const matches = (a, q) => {
@@ -189,10 +191,25 @@ function PhotoDrop({ applicant, onDone }) {
     if (!file.type.startsWith("image/")) return setMsg("That is not an image.");
 
     setBusy(true);
+    setMsg("Preparing…");
+    const prepared = await shrink(file);
+
+    // Checked here as well as on the server: an oversized body never reaches
+    // the route in production, so this is the only place the person sees why.
+    if (prepared.size > MAX_UPLOAD_BYTES) {
+      setBusy(false);
+      const mb = (prepared.size / 1024 / 1024).toFixed(1);
+      return setMsg(
+        /heic|heif/i.test(prepared.type)
+          ? `This iPhone photo is ${mb}MB and the browser cannot shrink HEIC. Save it as JPEG and try again (limit ${MAX_UPLOAD_LABEL}).`
+          : `Image is ${mb}MB; the limit is ${MAX_UPLOAD_LABEL}.`
+      );
+    }
+
     setMsg("Uploading…");
     const body = new FormData();
     body.append("applicantId", applicant.id);
-    body.append("file", await shrink(file));
+    body.append("file", prepared);
 
     const res = await fetch("/api/photo", { method: "POST", body });
     const data = await res.json().catch(() => ({}));
@@ -261,7 +278,7 @@ function PhotoDrop({ applicant, onDone }) {
               onChange={(e) => upload(e.target.files?.[0])}
             />
             <span className="drop-big">Drag a photo here</span>
-            <span className="drop-small">or click to choose a file · max 6MB</span>
+            <span className="drop-small">or click to choose a file · max {MAX_UPLOAD_LABEL}</span>
           </div>
 
           <div className="btn-row">

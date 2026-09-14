@@ -1,10 +1,10 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { getCurrentGrader } from "@/lib/auth";
+import { MAX_UPLOAD_BYTES, MAX_UPLOAD_LABEL } from "@/lib/upload";
 
 export const runtime = "nodejs";
 
-const MAX_BYTES = 6 * 1024 * 1024; // 6MB — a phone photo, before the client shrinks it
 const ALLOWED = ["image/jpeg", "image/png", "image/webp", "image/gif", "image/heic"];
 
 export async function POST(req) {
@@ -29,9 +29,11 @@ export async function POST(req) {
       { status: 400 }
     );
   }
-  if (file.size > MAX_BYTES) {
+  if (file.size > MAX_UPLOAD_BYTES) {
     return NextResponse.json(
-      { error: `Image is ${(file.size / 1024 / 1024).toFixed(1)}MB; the limit is 6MB.` },
+      {
+        error: `Image is ${(file.size / 1024 / 1024).toFixed(1)}MB; the limit is ${MAX_UPLOAD_LABEL}.`,
+      },
       { status: 413 }
     );
   }
