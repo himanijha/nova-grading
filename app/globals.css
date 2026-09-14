@@ -62,6 +62,8 @@ a { color: inherit; }
 .grade-layout {
   display: grid;
   grid-template-columns: 320px minmax(0, 1fr) 340px;
+  /* auto strip on top, then the three scrolling columns fill what is left */
+  grid-template-rows: auto minmax(0, 1fr);
   gap: 0;
   height: calc(100vh - 58px);
 }
@@ -428,3 +430,77 @@ input[type="range"] {
   }
   .yc-cut, .yc-count { text-align: left; grid-column: 2; }
 }
+/* Review coverage strip ----------------------------------------------------
+   Spans the grading layout above the three columns. Answers one question at a
+   glance: how far is the whole pile from one, two and three reviews each. */
+.coverage {
+  grid-column: 1 / -1;
+  background: var(--panel);
+  border-bottom: 1px solid var(--line);
+  padding: 10px 16px 12px;
+}
+.cov-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin-bottom: 8px;
+}
+.cov-title {
+  font-size: 11px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+.cov-spread {
+  display: flex;
+  gap: 14px;
+  flex-wrap: wrap;
+  font-size: 12px;
+  color: var(--muted);
+}
+.cov-spread strong { color: var(--ink); font-variant-numeric: tabular-nums; }
+
+.cov-targets {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+/* Each target is one group; the rule between them stops "11 to go" from
+   reading as though it belongs to the next label along. */
+.cov-target {
+  /* Sized to its own content so the trailing gap separates the groups. */
+  flex: 0 1 auto;
+  display: grid;
+  grid-template-columns: auto auto 72px 96px;
+  align-items: center;
+  gap: 10px;
+  font-size: 13px;
+}
+.cov-target + .cov-target {
+  border-left: 1px solid var(--line);
+  padding-left: 20px;
+  margin-left: 20px;
+}
+.cov-label { color: var(--muted); white-space: nowrap; }
+.cov-num { font-variant-numeric: tabular-nums; white-space: nowrap; }
+.cov-num strong { font-size: 15px; }
+.cov-of { color: var(--muted); margin-left: 2px; }
+.cov-left {
+  text-align: left;
+  color: var(--warn);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+.cov-left.done { color: var(--good); }
+
+@media (max-width: 1100px) {
+  .cov-targets { flex-direction: column; align-items: stretch; gap: 4px; }
+  .cov-target + .cov-target {
+    border-left: 0;
+    padding-left: 0;
+    margin-left: 0;
+  }
+}
+

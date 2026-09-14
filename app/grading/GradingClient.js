@@ -65,10 +65,56 @@ function Essay({ q, a }) {
   );
 }
 
+/** Review coverage across every application, regardless of the sidebar filter. */
+function Coverage({ coverage }) {
+  const { total, targets, exact, threePlus } = coverage;
+  return (
+    <div className="coverage">
+      <div className="cov-head">
+        <span className="cov-title">Review coverage</span>
+        <span className="cov-spread">
+          {exact.map((e) => (
+            <span key={e.n}>
+              <strong>{e.count}</strong> with {e.n}
+            </span>
+          ))}
+          <span>
+            <strong>{threePlus}</strong> with 3+
+          </span>
+        </span>
+      </div>
+
+      <div className="cov-targets">
+        {targets.map((t) => {
+          const pct = total ? Math.round((t.have / total) * 100) : 0;
+          return (
+            <div className="cov-target" key={t.n}>
+              <div className="cov-label">
+                {t.n}+ review{t.n === 1 ? "" : "s"}
+              </div>
+              <div className="cov-num">
+                <strong>{t.have}</strong>
+                <span className="cov-of">/ {total}</span>
+              </div>
+              <div className={`cov-left${t.left === 0 ? " done" : ""}`}>
+                {t.left === 0 ? "all covered" : `${t.left} to go`}
+              </div>
+              <span className="bd-track" title={`${pct}% of applications`}>
+                <span className="bd-fill" style={{ width: `${pct}%` }} />
+              </span>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
 export default function GradingClient({
   grader,
   list,
   applicant,
+  coverage,
   totalApplicants,
   myReviewCount,
   sort,
@@ -116,6 +162,8 @@ export default function GradingClient({
 
   return (
     <div className="grade-layout">
+      <Coverage coverage={coverage} />
+
       <aside className="sidebar">
         <div className="sidebar-head">
           <h2>Applications</h2>

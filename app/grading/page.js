@@ -118,6 +118,26 @@ export default async function GradingPage({ searchParams }) {
   const totalApplicants = await prisma.applicant.count();
   const myReviewCount = await prisma.grade.count({ where: { graderId: grader.id } });
 
+  // Coverage is a property of the whole pile, not of whatever the sidebar is
+  // filtered to — "12 still need a second review" has to mean 12 overall, or
+  // it silently changes every time someone searches.
+  const reviewCounts = await prisma.applicant.findMany({
+    select: { _count: { select: { grades: true } } },
+  });
+  const counts = reviewCounts.map((a) => a._count.grades);
+  const coverage = {
+    total: counts.length,
+    // For each target: how many have reached it, and how many have not.
+    targets: [1, 2, 3].map((n) => ({
+      n,
+      have: counts.filter((c) => c >= n).length,
+      left: counts.filter((c) => c < n).length,
+    })),
+    // The exact spread, so "3" does not hide someone sitting on six reviews.
+    exact: [0, 1, 2].map((n) => ({ n, count: counts.filter((c) => c === n).length })),
+    threePlus: counts.filter((c) => c >= 3).length,
+  };
+
   return (
     <>
       <Nav grader={grader} />
@@ -126,6 +146,7 @@ export default async function GradingPage({ searchParams }) {
         list={list}
         applicant={applicant}
         totalApplicants={totalApplicants}
+        coverage={coverage}
         myReviewCount={myReviewCount}
         sort={sort}
         role={role}
