@@ -27,6 +27,8 @@ export default function Nav({ grader }) {
       <div className="nav-links">
         {link("/rankings", "Rankings")}
         {link("/grading", "Grading")}
+        {link("/mugshots", "Mugshots")}
+        {link("/interview-selection", "Interviews")}
         {link("/import", "Import CSV")}
         {grader?.isAdmin && link("/admin", "Admin")}
         <span className="nav-who">{grader?.name}</span>

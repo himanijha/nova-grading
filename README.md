@@ -145,6 +145,21 @@ every grader who has already scored this application and their scores.
 
 Each grader has one grade per applicant; saving again updates it.
 
+**Mugshots** — attach a photo to an application by finding the applicant and
+dropping an image on the page (or clicking to browse). Photos are stored in the
+database rather than on disk, so they survive a redeploy and are included in a
+database backup. Large images are shrunk in the browser before upload; the cap
+is 6MB. Separately on the same page, search for anyone and record a verdict —
+double thumbs up, thumbs up, maybe, thumbs down — with a note saying why. One
+verdict per grader per applicant; rating again replaces yours.
+
+**Interview selection** — ranks people by those verdicts and *ignores the
+application scores entirely*. The number is the average across everyone who
+rated them: double thumbs up is 3, thumbs up 2, maybe 1, thumbs down 0. An
+average rather than a total, so someone three people loved is not buried by
+someone six people shrugged at — the rater count sits alongside so thin
+evidence stays visible. Click the thumbs in a row to read the notes.
+
 **Admin** (admins only) — add or remove graders, see grading progress, and
 generate password reset links.
 

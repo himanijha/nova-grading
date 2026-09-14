@@ -17,6 +17,8 @@ model Grader {
   createdAt    DateTime @default(now())
 
   grades       Grade[]
+  ratings      Rating[]
+  photos       ApplicantPhoto[]
   resetTokens  PasswordResetToken[]
 }
 
@@ -58,8 +60,46 @@ model Applicant {
   createdAt     DateTime @default(now())
 
   grades        Grade[]
+  photo         ApplicantPhoto?
+  ratings       Rating[]
 
   @@index([roleCategory])
+}
+
+// The mugshot. Stored in the database rather than on disk so it survives a
+// redeploy — hosted Node filesystems are ephemeral — and so a backup of the
+// database is a backup of the photos too. One per applicant; re-uploading
+// replaces it.
+model ApplicantPhoto {
+  id           String   @id @default(cuid())
+  applicantId  String   @unique
+  applicant    Applicant @relation(fields: [applicantId], references: [id], onDelete: Cascade)
+
+  data         Bytes
+  mimeType     String
+  byteSize     Int
+  uploadedById String?
+  uploadedBy   Grader?  @relation(fields: [uploadedById], references: [id], onDelete: SetNull)
+  updatedAt    DateTime @updatedAt
+}
+
+// Interview selection runs on these, not on the rubric scores. One per grader
+// per applicant, like a grade, so the ranking can aggregate across the team.
+model Rating {
+  id          String   @id @default(cuid())
+  applicantId String
+  applicant   Applicant @relation(fields: [applicantId], references: [id], onDelete: Cascade)
+  graderId    String
+  grader      Grader   @relation(fields: [graderId], references: [id], onDelete: Cascade)
+
+  value       String   // DOUBLE_UP | UP | MAYBE | DOWN
+  note        String?
+
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@unique([applicantId, graderId])
+  @@index([applicantId])
 }
 
 model Grade {
