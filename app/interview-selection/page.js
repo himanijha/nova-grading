@@ -2,6 +2,7 @@ import { redirect } from "next/navigation";
 import { getCurrentGrader } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import { ratingScore, ratingTally } from "@/lib/ratings";
+import { normalizeGradYear } from "@/lib/mapping";
 import Nav from "../Nav";
 import InterviewClient from "./InterviewClient";
 
@@ -31,7 +32,8 @@ export default async function InterviewSelectionPage() {
   const applicants = rows.map((a) => ({
     id: a.id,
     fullName: a.fullName,
-    gradYear: a.gradYear,
+    // Canonical, so a cohort gets one cutoff rather than one per spelling.
+    gradYear: normalizeGradYear(a.gradYear) || "Unknown",
     majors: a.majors,
     roleCategory: a.roleCategory,
     hasPhoto: !!a.photo,

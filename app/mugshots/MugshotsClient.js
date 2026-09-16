@@ -3,6 +3,7 @@
 import { useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { RATINGS, ratingMeta } from "@/lib/ratings";
+import { Mugshot } from "../Mugshot";
 
 import { MAX_UPLOAD_BYTES, MAX_UPLOAD_LABEL } from "@/lib/upload";
 
@@ -15,32 +16,6 @@ const matches = (a, q) => {
     .filter(Boolean)
     .some((v) => String(v).toLowerCase().includes(s));
 };
-
-function Avatar({ applicant, size = 38 }) {
-  const initials = applicant.fullName
-    .split(/\s+/)
-    .slice(0, 2)
-    .map((w) => w[0])
-    .join("")
-    .toUpperCase();
-
-  if (!applicant.hasPhoto) {
-    return (
-      <span className="mug-avatar blank" style={{ width: size, height: size }}>
-        {initials}
-      </span>
-    );
-  }
-  return (
-    /* eslint-disable-next-line @next/next/no-img-element */
-    <img
-      className="mug-avatar"
-      style={{ width: size, height: size }}
-      src={`/api/photo/${applicant.id}?v=${applicant.photoVersion}`}
-      alt={applicant.fullName}
-    />
-  );
-}
 
 /** Search box + result list. Used twice on this page, independently. */
 function Picker({ id, label, applicants, selectedId, onSelect, query, onQuery }) {
@@ -70,7 +45,7 @@ function Picker({ id, label, applicants, selectedId, onSelect, query, onQuery })
             className={`mug-result${a.id === selectedId ? " on" : ""}`}
             onClick={() => onSelect(a.id)}
           >
-            <Avatar applicant={a} />
+            <Mugshot applicant={a} zoom={false} />
             <span className="mug-result-text">
               <strong>{a.fullName}</strong>
               <span className="mug-sub">
@@ -242,7 +217,7 @@ function PhotoDrop({ applicant, onDone }) {
       {applicant && (
         <>
           <div className="mug-target">
-            <Avatar applicant={applicant} size={52} />
+            <Mugshot applicant={applicant} size={110} />
             <div>
               <strong>{applicant.fullName}</strong>
               <div className="mug-sub">
@@ -332,7 +307,7 @@ function RatePanel({ grader, applicant, onDone }) {
       <div className="mug-label">2. Give a verdict</div>
 
       <div className="mug-target">
-        <Avatar applicant={applicant} size={52} />
+        <Mugshot applicant={applicant} size={110} />
         <div>
           <strong>{applicant.fullName}</strong>
           <div className="mug-sub">

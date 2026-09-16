@@ -721,3 +721,72 @@ textarea.inp.needed { border-color: var(--danger); }
   color: var(--muted);
   margin-left: 1px;
 }
+
+/* Mugshot zoom --------------------------------------------------------------
+   The thumbnail is a cropped circle and can cut off half a face, so it opens
+   the photo as it was uploaded. */
+.mug-zoom {
+  display: inline-flex;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: none;
+  cursor: zoom-in;
+  flex-shrink: 0;
+}
+.mug-zoom:hover .mug-avatar { border-color: var(--accent); }
+.mug-zoom:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+.lightbox {
+  position: fixed;
+  inset: 0;
+  z-index: 50;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  background: rgba(20, 18, 28, 0.72);
+  cursor: zoom-out;
+}
+.lightbox-inner {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  max-width: min(720px, 100%);
+  cursor: auto;
+}
+.lightbox-inner img {
+  max-width: 100%;
+  /* Room for the caption bar underneath, whatever the photo's shape. */
+  max-height: calc(100vh - 140px);
+  object-fit: contain;
+  border-radius: var(--radius);
+  background: var(--panel);
+}
+.lightbox-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  color: #fff;
+}
+
+/* The mugshot next to the selected applicant: big enough to recognise someone
+   from across a room, square-ish rather than a token circle. */
+.mug-target .mug-avatar,
+.mug-target .mug-zoom {
+  border-radius: 12px;
+}
+
+/* A second, quieter route to the same application, so the link is findable
+   without knowing the name doubles as one. */
+.rank-table .app-link {
+  display: block;
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--muted);
+  text-decoration: none;
+}
+.rank-table .app-link:hover { text-decoration: underline; }
+.rank-table td .mug-avatar,
+.rank-table td .mug-zoom { border-radius: 10px; }
