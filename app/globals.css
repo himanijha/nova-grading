@@ -58,6 +58,8 @@ a { color: inherit; }
 .nav-links a:hover, .nav-links button:hover { opacity: 1; }
 .nav-links a.active { font-weight: 700; opacity: 1; }
 .nav-who { font-size: 13px; opacity: 0.65; }
+a.nav-who { text-decoration: none; }
+a.nav-who:hover, a.nav-who.active { opacity: 1; }
 
 /* ---------- grading layout ---------- */
 .grade-layout {

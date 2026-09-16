@@ -31,7 +31,15 @@ export default function Nav({ grader }) {
         {link("/interview-selection", "Interviews")}
         {link("/import", "Import CSV")}
         {grader?.isAdmin && link("/admin", "Admin")}
-        <span className="nav-who">{grader?.name}</span>
+        {/* Your own name is the way to your account — nothing else in the nav
+            is about you, and an extra top-level link would crowd it. */}
+        <Link
+          href="/account"
+          className={`nav-who${path === "/account" ? " active" : ""}`}
+          title="Your account"
+        >
+          {grader?.name}
+        </Link>
         <button onClick={logout}>Logout</button>
       </div>
     </nav>
