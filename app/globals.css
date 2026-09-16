@@ -792,3 +792,40 @@ textarea.inp.needed { border-color: var(--danger); }
 .rank-table .app-link:hover { text-decoration: underline; }
 .rank-table td .mug-avatar,
 .rank-table td .mug-zoom { border-radius: 10px; }
+
+/* Notes column ------------------------------------------------------------
+   Grading notes and mugshot notes are written on two different screens; this
+   is where they are read together. */
+.note-btn {
+  border: 0;
+  background: none;
+  padding: 2px 0;
+  font: inherit;
+  font-size: 13px;
+  color: var(--ink);
+  cursor: pointer;
+  white-space: nowrap;
+}
+.note-btn:hover { text-decoration: underline; }
+.note-btn:disabled {
+  color: var(--muted);
+  cursor: default;
+  text-decoration: none;
+}
+.note-group { padding: 6px 0; }
+.note-group + .note-group { border-top: 1px solid var(--line); }
+.note-group-title {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--ink);
+  margin-bottom: 2px;
+}
+/* Which criterion a note is about, held in a fixed column so a grader's five
+   notes read as a list rather than a paragraph. */
+.note-label {
+  flex: 0 0 104px;
+  font-size: 11px;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--muted);
+}

@@ -26,6 +26,21 @@ function overrideFor(grades) {
 const overrideRank = (a) =>
   a.override === "ACCEPT" ? 0 : a.override === "REJECT" ? 2 : 1;
 
+const CRITERION_LABEL = {
+  technicalNote: "Technical",
+  thoughtfulnessNote: "Thoughtfulness",
+  initiativeNote: "Initiative",
+  communityFitNote: "Community fit",
+  overallNote: "Overall",
+};
+
+/** Everything one grader wrote about an applicant, in rubric order. */
+function notesFrom(grade) {
+  return Object.entries(CRITERION_LABEL)
+    .map(([key, label]) => ({ label, text: (grade[key] || "").trim() }))
+    .filter((n) => n.text);
+}
+
 export default async function RankingsPage() {
   const grader = await getCurrentGrader();
   if (!grader) redirect("/login");
@@ -44,9 +59,19 @@ export default async function RankingsPage() {
           initiative: true,
           communityFit: true,
           autoDecision: true,
+          technicalNote: true,
+          thoughtfulnessNote: true,
+          initiativeNote: true,
+          communityFitNote: true,
           overallNote: true,
           grader: { select: { name: true } },
         },
+      },
+      // The thumbs from Mugshots carry their own notes, and they were only
+      // readable on the Interview page — so a reason someone wrote while
+      // looking at a face never reached the person reading the rankings.
+      ratings: {
+        select: { value: true, note: true, grader: { select: { name: true } } },
       },
     },
   });
@@ -62,16 +87,29 @@ export default async function RankingsPage() {
       majors: a.majors,
       roleCategory: a.roleCategory,
       reviewCount: a.grades.length,
-      // Auto accepts/rejects travel with their reason so the table can explain
-      // why someone sits where they do without opening the grading screen.
-      autoDecisions: a.grades
-        .filter((g) => g.autoDecision)
+      // Every written word about this applicant, so the table can explain why
+      // someone sits where they do without opening the grading screen. A
+      // grader with an auto decision is kept even when they wrote nothing —
+      // their verdict is the thing that needs explaining.
+      graderNotes: a.grades
         .map((g) => ({
-          decision: g.autoDecision,
-          note: g.overallNote,
           graderName: g.grader.name,
+          total: g.technical + g.thoughtfulness + g.initiative + g.communityFit,
+          autoDecision: g.autoDecision,
+          notes: notesFrom(g),
+        }))
+        .filter((g) => g.notes.length > 0 || g.autoDecision),
+      ratingNotes: a.ratings
+        .filter((r) => (r.note || "").trim())
+        .map((r) => ({
+          value: r.value,
+          note: r.note.trim(),
+          graderName: r.grader.name,
         })),
       override: overrideFor(a.grades),
+      noteCount:
+        a.grades.reduce((n, g) => n + notesFrom(g).length, 0) +
+        a.ratings.filter((r) => (r.note || "").trim()).length,
       average: totals.length ? Number(avg(totals).toFixed(2)) : null,
       criteria: {
         technical: Number(avg(a.grades.map((g) => g.technical)).toFixed(2)),

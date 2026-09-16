@@ -3,6 +3,7 @@
 import { Fragment, useMemo, useState } from "react";
 import Link from "next/link";
 import { compareGradYears, gradYearParts, GRAD_YEAR_OPTIONS } from "@/lib/mapping";
+import { ratingMeta } from "@/lib/ratings";
 
 const ROLE_LABEL = {
   DEVELOPER: "Developer",
@@ -38,6 +39,60 @@ function Breakdown({ title, rows, total }) {
         </div>
       ))}
     </div>
+  );
+}
+
+/**
+ * Everything anyone wrote about an applicant, in one place: the thumbs notes
+ * from Mugshots and the per-criterion notes from grading. They are written on
+ * two different screens, and whoever is reading the rankings needs both.
+ */
+function Notes({ applicant }) {
+  const { ratingNotes, graderNotes } = applicant;
+
+  if (ratingNotes.length === 0 && graderNotes.length === 0) {
+    return <div className="note-line">Nobody has written anything yet.</div>;
+  }
+
+  return (
+    <>
+      {ratingNotes.length > 0 && (
+        <div className="note-group">
+          <div className="note-group-title">Interview thumbs — from Mugshots</div>
+          {ratingNotes.map((r, n) => (
+            <div className="note-line" key={n}>
+              <span title={ratingMeta(r.value)?.label}>{ratingMeta(r.value)?.icon}</span>
+              <strong>{r.graderName}</strong>
+              <span>{r.note}</span>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {graderNotes.map((g, n) => (
+        <div className="note-group" key={n}>
+          <div className="note-group-title">
+            {g.autoDecision && (
+              <span className={`dtag ${g.autoDecision.toLowerCase()}`}>
+                {g.autoDecision === "ACCEPT" ? "auto accept" : "auto reject"}
+              </span>
+            )}
+            {g.graderName} · {g.total}/{MAX_SCORE}
+          </div>
+          {g.notes.map((note) => (
+            <div className="note-line" key={note.label}>
+              <span className="note-label">{note.label}</span>
+              <span>{note.text}</span>
+            </div>
+          ))}
+          {g.notes.length === 0 && (
+            <div className="note-line">
+              <span>No reason given.</span>
+            </div>
+          )}
+        </div>
+      ))}
+    </>
   );
 }
 
@@ -305,6 +360,7 @@ export default function RankingsClient({ applicants }) {
                 <th className="num">Init</th>
                 <th className="num">Comm</th>
                 <th className="num">Reviews</th>
+                <th className="num">Notes</th>
               </tr>
             </thead>
             <tbody>
@@ -313,7 +369,7 @@ export default function RankingsClient({ applicants }) {
                 // In a single-year view the list is one clean cut, so mark the line.
                 const showCut =
                   singleYear && !ok && (i === 0 || isAbove(graded[i - 1]));
-                const cols = singleYear ? 10 : 11;
+                const cols = singleYear ? 11 : 12;
                 return (
                   <Fragment key={a.id}>
                     {showCut && (
@@ -362,19 +418,27 @@ export default function RankingsClient({ applicants }) {
                       <td className="num">{a.criteria.initiative.toFixed(1)}</td>
                       <td className="num">{a.criteria.communityFit.toFixed(1)}</td>
                       <td className="num">{a.reviewCount}</td>
+                      <td className="num">
+                        <button
+                          type="button"
+                          className="note-btn"
+                          disabled={a.noteCount === 0}
+                          aria-expanded={openNotes === a.id}
+                          title={
+                            a.noteCount === 0
+                              ? "Nobody has written anything yet"
+                              : "Read what the graders wrote"
+                          }
+                          onClick={() => setOpenNotes(openNotes === a.id ? null : a.id)}
+                        >
+                          {a.noteCount === 0 ? "—" : `💬 ${a.noteCount}`}
+                        </button>
+                      </td>
                     </tr>
-                    {openNotes === a.id && a.autoDecisions.length > 0 && (
+                    {openNotes === a.id && (
                       <tr className="note-row">
                         <td colSpan={cols}>
-                          {a.autoDecisions.map((d, n) => (
-                            <div className="note-line" key={n}>
-                              <span className={`dtag ${d.decision.toLowerCase()}`}>
-                                {d.decision === "ACCEPT" ? "auto accept" : "auto reject"}
-                              </span>
-                              <strong>{d.graderName}</strong>
-                              <span>{d.note || "No reason given."}</span>
-                            </div>
-                          ))}
+                          <Notes applicant={a} />
                         </td>
                       </tr>
                     )}
