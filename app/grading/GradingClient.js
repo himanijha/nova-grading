@@ -65,47 +65,75 @@ function Essay({ q, a }) {
   );
 }
 
-/** Review coverage across every application, regardless of the sidebar filter. */
+/**
+ * Review coverage across every application, regardless of the sidebar filter.
+ * Folded away by default: the numbers matter when you go looking for them, and
+ * the rest of the time they crowd out the application you are actually reading.
+ */
 function Coverage({ coverage }) {
+  const [open, setOpen] = useState(false);
   const { total, targets, exact, threePlus } = coverage;
+
+  // The one number worth reading without opening anything: how much of the pile
+  // has not been touched at all.
+  const unreviewed = targets.find((t) => t.n === 1)?.left ?? 0;
+
   return (
     <div className="coverage">
-      <div className="cov-head">
-        <span className="cov-title">Review coverage</span>
-        <span className="cov-spread">
-          {exact.map((e) => (
-            <span key={e.n}>
-              <strong>{e.count}</strong> with {e.n}
-            </span>
-          ))}
-          <span>
-            <strong>{threePlus}</strong> with 3+
-          </span>
+      <button
+        type="button"
+        className="cov-toggle"
+        aria-expanded={open}
+        onClick={() => setOpen((o) => !o)}
+      >
+        <span className={`cov-caret${open ? " open" : ""}`} aria-hidden="true">
+          ▸
         </span>
-      </div>
+        <span className="cov-title">Review coverage</span>
+        <span className={`cov-hint${unreviewed === 0 ? " done" : ""}`}>
+          {unreviewed === 0
+            ? "every application has a review"
+            : `${unreviewed} of ${total} still ${unreviewed === 1 ? "has" : "have"} no review`}
+        </span>
+      </button>
 
-      <div className="cov-targets">
-        {targets.map((t) => {
-          const pct = total ? Math.round((t.have / total) * 100) : 0;
-          return (
-            <div className="cov-target" key={t.n}>
-              <div className="cov-label">
-                {t.n}+ review{t.n === 1 ? "" : "s"}
-              </div>
-              <div className="cov-num">
-                <strong>{t.have}</strong>
-                <span className="cov-of">/ {total}</span>
-              </div>
-              <div className={`cov-left${t.left === 0 ? " done" : ""}`}>
-                {t.left === 0 ? "all covered" : `${t.left} to go`}
-              </div>
-              <span className="bd-track" title={`${pct}% of applications`}>
-                <span className="bd-fill" style={{ width: `${pct}%` }} />
+      {open && (
+        <div className="cov-panel">
+          <div className="cov-targets">
+            {targets.map((t) => {
+              const pct = total ? Math.round((t.have / total) * 100) : 0;
+              return (
+                <div className="cov-target" key={t.n}>
+                  <div className="cov-label">
+                    {t.n}+ review{t.n === 1 ? "" : "s"}
+                  </div>
+                  <span className="bd-track" title={`${pct}% of applications`}>
+                    <span className="bd-fill" style={{ width: `${pct}%` }} />
+                  </span>
+                  <div className="cov-num">
+                    <strong>{t.have}</strong>
+                    <span className="cov-of">/ {total}</span>
+                  </div>
+                  <div className={`cov-left${t.left === 0 ? " done" : ""}`}>
+                    {t.left === 0 ? "all covered" : `${t.left} to go`}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+
+          <div className="cov-spread">
+            {exact.map((e) => (
+              <span key={e.n}>
+                <strong>{e.count}</strong> with exactly {e.n}
               </span>
-            </div>
-          );
-        })}
-      </div>
+            ))}
+            <span>
+              <strong>{threePlus}</strong> with 3 or more
+            </span>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
