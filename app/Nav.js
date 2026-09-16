@@ -114,12 +114,29 @@ export default function Nav({ grader }) {
           Settings
         </Link>
 
-        {/* Your own name is the way to your account — nothing else in the nav
-            is about you, and an extra top-level link would crowd it. */}
-        <Link href="/settings" className="nav-who" title="Your account">
-          {grader?.name}
-        </Link>
-        <button onClick={logout}>Logout</button>
+        {/* Your own name is the only thing in the nav that is about you, so
+            logging out lives under it rather than sitting out in the open. */}
+        <div className="nav-group">
+          <button
+            type="button"
+            className="nav-grp-btn nav-who"
+            aria-expanded={open === "me"}
+            aria-haspopup="true"
+            onClick={() => setOpen((o) => (o === "me" ? null : "me"))}
+          >
+            {grader?.name}
+            <span className={`nav-caret${open === "me" ? " open" : ""}`} aria-hidden="true">
+              ▾
+            </span>
+          </button>
+          {open === "me" && (
+            <div className="nav-menu right">
+              <button type="button" onClick={logout}>
+                Logout
+              </button>
+            </div>
+          )}
+        </div>
       </div>
     </nav>
   );
