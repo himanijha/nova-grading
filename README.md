@@ -25,7 +25,8 @@ Open http://localhost:3000 and sign in as any demo grader:
 | `sam@nova.demo` | `password123` |
 | `tia@nova.demo` | `password123` |
 
-Demo graders are not admins. To see the Admin page, make yourself an account
+Demo graders are not admins. To see the admin half of Settings — and the
+Import CSV page — make yourself an account
 (the password must be at least 8 characters):
 
 ```bash
@@ -111,15 +112,19 @@ average rather than a total, so someone three people loved is not buried by
 someone six people shrugged at — the rater count sits alongside so thin evidence
 stays visible. Click the thumbs in a row to read the notes.
 
-**Admin** (admins only) — add or remove graders, see grading progress, and
-generate password reset links.
+**Settings** — change your own password. Admins also get the grader roster:
+add or remove graders, see grading progress, and generate password reset links.
+
+The nav groups these by stage: **Forms** (Import CSV, admins only),
+**Applications** (Grading, Rankings), **Coffee chats** (Mugshots, Interview
+candidates), then Settings.
 
 ## Passwords
 
 Graders sign in with email and password. "Forgot your password?" generates a
 one-hour, single-use reset link. No mail service is wired up, so the link is
 shown directly to the requester on-screen; an admin can also generate a reset
-link for any grader from the Admin page. To send these by email instead, add
+link for any grader from Settings. To send these by email instead, add
 your mail provider inside `app/api/forgot/route.js` where the link is currently
 returned.
 
@@ -182,7 +187,7 @@ else needs configuring.
 - **Share the Drive folder** holding the form's resume uploads with every
   grader's Google account, or the resume pane in the grading view is blank for
   them.
-- **Add your graders** from the Admin page, and send each the reset link it
+- **Add your graders** from Settings, and send each the reset link it
   generates.
 
 ### Upload size
@@ -219,6 +224,6 @@ provider's own snapshots.
 - `lib/mapping.js` — CSV header matching, role categorising, Drive URL handling
 - `app/rankings/` — the ranking + cutoff screen
 - `app/grading/` — the grading screen
-- `app/import/` — CSV upload and column mapping
-- `app/admin/` — grader management
+- `app/import/` — CSV upload and column mapping, admins only
+- `app/settings/` — your password, plus grader management for admins
 - `scripts/` — seeding, backup / restore

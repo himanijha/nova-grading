@@ -57,6 +57,10 @@ export default function ImportClient() {
         automatically — check the mapping below and fix anything that&rsquo;s off
         before importing.
       </p>
+      <p className="sub admin-only">
+        Admins only. An import rewrites every application in the database, so
+        graders cannot run one.
+      </p>
 
       <div className="card">
         <input type="file" accept=".csv,text/csv" onChange={onFile} />

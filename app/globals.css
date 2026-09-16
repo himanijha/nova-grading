@@ -61,6 +61,47 @@ a { color: inherit; }
 a.nav-who { text-decoration: none; }
 a.nav-who:hover, a.nav-who.active { opacity: 1; }
 
+/* Each stage of the season is one menu, so a grader picks the stage first and
+   the page second. */
+.nav-group { position: relative; display: flex; }
+.nav-links .nav-grp-btn {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  padding: 0;
+}
+.nav-links .nav-grp-btn.active { font-weight: 700; opacity: 1; }
+.nav-caret {
+  font-size: 10px;
+  line-height: 1;
+  transition: transform 0.12s ease;
+}
+.nav-caret.open { transform: rotate(180deg); }
+.nav-menu {
+  position: absolute;
+  top: calc(100% + 10px);
+  left: -12px;
+  z-index: 40;
+  min-width: 190px;
+  display: flex;
+  flex-direction: column;
+  padding: 6px;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  box-shadow: 0 10px 28px rgba(22, 18, 31, 0.18);
+}
+.nav-links .nav-menu a {
+  color: var(--ink);
+  opacity: 1;
+  font-size: 14px;
+  padding: 8px 10px;
+  border-radius: 6px;
+  white-space: nowrap;
+}
+.nav-links .nav-menu a:hover { background: var(--bg); }
+.nav-links .nav-menu a.active { font-weight: 700; }
+
 /* ---------- grading layout ---------- */
 .grade-layout {
   display: grid;
@@ -842,3 +883,12 @@ textarea.inp.needed { border-color: var(--danger); }
   text-transform: uppercase;
   color: var(--muted);
 }
+
+/* A card's own one-line explanation, under its heading. */
+.card-sub {
+  margin: -4px 0 14px;
+  color: var(--muted);
+  font-size: 13px;
+}
+/* The import page says who it is for; graders never reach it. */
+.admin-only { color: var(--warn); }

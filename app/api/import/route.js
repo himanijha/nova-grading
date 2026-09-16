@@ -27,6 +27,8 @@ const clean = (v) => {
 export async function POST(req) {
   const grader = await getCurrentGrader();
   if (!grader) return NextResponse.json({ error: "Not signed in." }, { status: 401 });
+  if (!grader.isAdmin)
+    return NextResponse.json({ error: "Only admins can import applications." }, { status: 403 });
 
   const { rows, mapping } = await req.json();
   if (!Array.isArray(rows) || !mapping) {
