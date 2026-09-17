@@ -459,6 +459,10 @@ function ScoringPanel({ grader, applicant, myGrade, list, onNavigate }) {
   const others = applicant.grades;
   const total = CRITERIA.reduce((sum, c) => sum + (scores[c.key] || 0), 0);
 
+  // Until you have graded this application yourself, the server sends you only
+  // your own grade — so the rest are a count, not a list.
+  const hidden = applicant.gradedByMe ? 0 : applicant.reviewCount;
+
   return (
     <aside className="scoring">
       <h2>Scoring</h2>
@@ -549,10 +553,16 @@ function ScoringPanel({ grader, applicant, myGrade, list, onNavigate }) {
       <div className="save-note">{msg}</div>
 
       <div className="graded-by">
-        <h4>Graded by ({others.length})</h4>
-        {others.length === 0 && (
+        <h4>Graded by ({applicant.reviewCount})</h4>
+        {applicant.reviewCount === 0 && (
           <div style={{ color: "var(--muted)", fontSize: 13 }}>
             No one has graded this application yet.
+          </div>
+        )}
+        {hidden > 0 && (
+          <div style={{ color: "var(--muted)", fontSize: 13 }}>
+            {hidden === 1 ? "1 review is" : `${hidden} reviews are`} hidden until
+            you save your own scores for this application.
           </div>
         )}
         {others.map((g) => (

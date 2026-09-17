@@ -77,6 +77,15 @@ export default async function GradingPage({ searchParams }) {
     });
 
     if (a) {
+      // Nobody — grader or admin — sees another person's scores on an
+      // application they have not graded themselves. Reading someone else's
+      // numbers first anchors your own. The filtering happens here rather than
+      // in the client so the hidden scores never reach the browser at all.
+      const gradedByMe = a.grades.some((g) => g.graderId === grader.id);
+      const visibleGrades = gradedByMe
+        ? a.grades
+        : a.grades.filter((g) => g.graderId === grader.id);
+
       applicant = {
         id: a.id,
         fullName: a.fullName,
@@ -96,7 +105,11 @@ export default async function GradingPage({ searchParams }) {
         qCommunity: a.qCommunity,
         links: a.links,
         anythingElse: a.anythingElse,
-        grades: a.grades.map((g) => ({
+        gradedByMe,
+        // How many reviews exist in total, so the panel can say a review is
+        // there without saying who left it or what they scored.
+        reviewCount: a.grades.length,
+        grades: visibleGrades.map((g) => ({
           id: g.id,
           graderId: g.graderId,
           graderName: g.grader.name,
