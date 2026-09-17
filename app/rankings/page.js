@@ -67,12 +67,6 @@ export default async function RankingsPage() {
           grader: { select: { name: true } },
         },
       },
-      // The thumbs from Mugshots carry their own notes, and they were only
-      // readable on the Interview page — so a reason someone wrote while
-      // looking at a face never reached the person reading the rankings.
-      ratings: {
-        select: { value: true, note: true, grader: { select: { name: true } } },
-      },
     },
   });
 
@@ -87,10 +81,12 @@ export default async function RankingsPage() {
       majors: a.majors,
       roleCategory: a.roleCategory,
       reviewCount: a.grades.length,
-      // Every written word about this applicant, so the table can explain why
-      // someone sits where they do without opening the grading screen. A
-      // grader with an auto decision is kept even when they wrote nothing —
-      // their verdict is the thing that needs explaining.
+      // What graders wrote while scoring, so the table can explain why someone
+      // sits where they do without opening the grading screen. The thumbs
+      // notes from Mugshots stay out of it — that is the interview round, and
+      // this page ranks the application. A grader with an auto decision is
+      // kept even when they wrote nothing — their verdict is the thing that
+      // needs explaining.
       graderNotes: a.grades
         .map((g) => ({
           graderName: g.grader.name,
@@ -99,17 +95,8 @@ export default async function RankingsPage() {
           notes: notesFrom(g),
         }))
         .filter((g) => g.notes.length > 0 || g.autoDecision),
-      ratingNotes: a.ratings
-        .filter((r) => (r.note || "").trim())
-        .map((r) => ({
-          value: r.value,
-          note: r.note.trim(),
-          graderName: r.grader.name,
-        })),
       override: overrideFor(a.grades),
-      noteCount:
-        a.grades.reduce((n, g) => n + notesFrom(g).length, 0) +
-        a.ratings.filter((r) => (r.note || "").trim()).length,
+      noteCount: a.grades.reduce((n, g) => n + notesFrom(g).length, 0),
       average: totals.length ? Number(avg(totals).toFixed(2)) : null,
       criteria: {
         technical: Number(avg(a.grades.map((g) => g.technical)).toFixed(2)),
