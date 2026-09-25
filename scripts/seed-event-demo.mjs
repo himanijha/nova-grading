@@ -121,10 +121,10 @@ for (const [ci, cohort] of cohorts.entries()) {
     const s = groupSymbol(i);
     groups.push(await prisma.group.create({ data: { cohortId: cohort.id, index: i, color: s.color, shape: s.shape } }));
   }
-  // One demo grader per group, cycling if there are more groups than graders.
+  // A grader sits at one symbol all hour, so with more groups than demo
+  // graders the rest are left without one — the Groups page flags that.
   await prisma.groupGrader.createMany({
-    data: groups.map((g, i) => ({ groupId: g.id, graderId: graders[i % graders.length].id })),
-    skipDuplicates: true,
+    data: groups.slice(0, graders.length).map((g, i) => ({ groupId: g.id, graderId: graders[i].id })),
   });
 
   const history = [];
@@ -141,10 +141,11 @@ for (const [ci, cohort] of cohorts.entries()) {
       for (const [applicantId, groupId] of split) {
         if (rng() > 0.45) continue;
         const gi = groups.findIndex((g) => g.id === groupId);
+        if (!graders[gi]) continue;
         await prisma.note.create({
           data: {
             applicantId,
-            graderId: graders[gi % graders.length].id,
+            graderId: graders[gi].id,
             roundId: round.id,
             groupId,
             body: SAMPLE_NOTES[Math.floor(rng() * SAMPLE_NOTES.length)],

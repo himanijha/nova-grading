@@ -112,47 +112,62 @@ export default function GroupsClient({ cohorts, cohortId, board, graders, isAdmi
 // --- how many groups, and who sits at each ---------------------------------
 
 function Setup({ board, graders, act, busy }) {
-  const [count, setCount] = useState(board.groups.length || "");
   const n = board.members.length;
-  const per = Number(count) > 0 ? n / Number(count) : null;
+  const count = board.groups.length;
+  const per = count ? n / count : null;
+  const setCount = (next) => act({ action: "setGroupCount", count: next });
 
-  useEffect(() => setCount(board.groups.length || ""), [board.groups.length]);
+  // Graders sit at one symbol for the whole hour, so each can be at only one
+  // group per cohort. Map grader → the group they're already at.
+  const seatedAt = {};
+  for (const g of board.groups) for (const x of g.graders) seatedAt[x.id] = g;
 
   return (
     <section className="card">
       <h3>Groups and graders</h3>
+      {/* A stepper that saves on each press, so the number shown is always
+          what the room actually has. */}
       <div className="setup-row">
-        <label htmlFor="gcount">Groups in the room</label>
-        <input
-          id="gcount"
-          className="inp"
-          type="number"
-          min="1"
-          max="40"
-          style={{ width: 90 }}
-          value={count}
-          onChange={(e) => setCount(e.target.value)}
-        />
-        <button
-          className="btn sm"
-          disabled={busy || !count || Number(count) === board.groups.length}
-          onClick={() => act({ action: "setGroupCount", count: Number(count) })}
-        >
-          Save
-        </button>
+        <span className="setup-label">Groups in the room</span>
+        <div className="stepper">
+          <button
+            type="button"
+            aria-label="One fewer group"
+            disabled={busy || count <= 1}
+            onClick={() => setCount(count - 1)}
+          >
+            −
+          </button>
+          <strong>{count}</strong>
+          <button
+            type="button"
+            aria-label="One more group"
+            disabled={busy || count >= 40}
+            onClick={() => setCount(count + 1)}
+          >
+            +
+          </button>
+        </div>
         <span className="muted small">
           {per
-            ? `${n} people → about ${Math.floor(per)}${per % 1 ? `–${Math.ceil(per)}` : ""} per group`
+            ? `${n} people → ${Math.floor(per)}${per % 1 ? `–${Math.ceil(per)}` : ""} per group`
             : `${n} people in this cohort`}
-          {Number(count) < board.groups.length &&
-            " · removing groups leaves their people unplaced in each round"}
+          {board.rounds.length > 0 &&
+            " · a removed group's people move to the smallest groups; a new group starts empty until you reshuffle"}
         </span>
       </div>
 
       {board.groups.length > 0 && (
         <div className="grader-grid">
           {board.groups.map((g) => (
-            <GraderPicker key={g.id} group={g} graders={graders} act={act} busy={busy} />
+            <GraderPicker
+              key={g.id}
+              group={g}
+              graders={graders}
+              seatedAt={seatedAt}
+              act={act}
+              busy={busy}
+            />
           ))}
         </div>
       )}
@@ -160,9 +175,9 @@ function Setup({ board, graders, act, busy }) {
   );
 }
 
-function GraderPicker({ group, graders, act, busy }) {
+function GraderPicker({ group, graders, seatedAt, act, busy }) {
   const ids = group.graders.map((g) => g.id);
-  const free = graders.filter((g) => !ids.includes(g.id));
+  const others = graders.filter((g) => !ids.includes(g.id));
   return (
     <div className="grader-pick">
       <GroupBadge group={group} />
@@ -182,7 +197,7 @@ function GraderPicker({ group, graders, act, busy }) {
             </button>
           </span>
         ))}
-        {free.length > 0 && (
+        {others.length > 0 && (
           <select
             className="chip-add"
             value=""
@@ -194,9 +209,11 @@ function GraderPicker({ group, graders, act, busy }) {
             }
           >
             <option value="">+ grader</option>
-            {free.map((g) => (
+            {/* Someone already at another symbol is moved here, not doubled up. */}
+            {others.map((g) => (
               <option key={g.id} value={g.id}>
                 {g.name}
+                {seatedAt[g.id] ? ` (move from ${seatedAt[g.id].name})` : ""}
               </option>
             ))}
           </select>

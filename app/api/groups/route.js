@@ -15,8 +15,9 @@ export async function POST(req) {
 
   switch (body.action) {
     // Grow or shrink the set of symbols. New groups get the next symbols in
-    // order; removed groups are always the last ones, and their people are
-    // left unplaced in each round rather than silently reshuffled.
+    // order and start empty. Removed groups are always the last ones; in each
+    // round their people go to the smallest remaining groups, so nobody is
+    // silently dropped.
     case "setGroupCount": {
       const count = Math.floor(Number(body.count));
       if (!(count >= 1 && count <= MAX_GROUPS)) return bad(`Pick between 1 and ${MAX_GROUPS} groups.`);
@@ -27,7 +28,25 @@ export async function POST(req) {
           select: { id: true, index: true },
         });
         if (groups.length > count) {
-          await tx.group.deleteMany({ where: { id: { in: groups.slice(count).map((g) => g.id) } } });
+          const kept = groups.slice(0, count).map((g) => g.id);
+          const removed = groups.slice(count).map((g) => g.id);
+          const rounds = await tx.round.findMany({
+            where: { cohortId: body.cohortId },
+            select: { id: true, placements: { select: { applicantId: true, groupId: true } } },
+          });
+          for (const r of rounds) {
+            const size = Object.fromEntries(kept.map((id) => [id, 0]));
+            for (const p of r.placements) if (p.groupId in size) size[p.groupId]++;
+            for (const p of r.placements.filter((x) => removed.includes(x.groupId))) {
+              const smallest = kept.reduce((a, id) => (size[id] < size[a] ? id : a), kept[0]);
+              size[smallest]++;
+              await tx.placement.update({
+                where: { roundId_applicantId: { roundId: r.id, applicantId: p.applicantId } },
+                data: { groupId: smallest },
+              });
+            }
+          }
+          await tx.group.deleteMany({ where: { id: { in: removed } } });
         }
         const data = [];
         for (let i = groups.length; i < count; i++) {
@@ -39,11 +58,22 @@ export async function POST(req) {
       return NextResponse.json({ ok: true });
     }
 
-    // { groupId, graderIds } — replaces who sits at this symbol.
+    // { groupId, graderIds } — replaces who sits at this symbol. A grader
+    // sits at one symbol per cohort, so adding them here takes them off any
+    // other group in the same cohort.
     case "setGraders": {
       const graderIds = Array.isArray(body.graderIds) ? [...new Set(body.graderIds)] : [];
+      const group = await prisma.group.findUnique({ where: { id: body.groupId }, select: { cohortId: true } });
+      if (!group) return bad("Group not found.", 404);
       await prisma.$transaction([
-        prisma.groupGrader.deleteMany({ where: { groupId: body.groupId } }),
+        prisma.groupGrader.deleteMany({
+          where: {
+            OR: [
+              { groupId: body.groupId },
+              { graderId: { in: graderIds }, group: { cohortId: group.cohortId } },
+            ],
+          },
+        }),
         prisma.groupGrader.createMany({
           data: graderIds.map((graderId) => ({ groupId: body.groupId, graderId })),
         }),
