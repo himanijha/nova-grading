@@ -6,12 +6,14 @@
     "dev": "next dev",
     "build": "prisma generate && next build",
     "start": "next start",
-    "seed": "node scripts/seed.mjs",
-    "seed:demo": "node scripts/seed-demo.mjs",
+    "seed": "node --env-file-if-exists=.env scripts/seed.mjs",
+    "seed:demo": "node --env-file-if-exists=.env scripts/seed-demo.mjs",
     "db:migrate": "prisma migrate deploy",
     "db:migrate:dev": "prisma migrate dev",
-    "export": "node scripts/export-data.mjs",
-    "import": "node scripts/import-data.mjs"
+    "export": "node --env-file-if-exists=.env scripts/export-data.mjs",
+    "import": "node --env-file-if-exists=.env scripts/import-data.mjs",
+    "test": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --test tests/*.test.js",
+    "seed:event": "node --env-file-if-exists=.env --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/seed-event-demo.mjs"
   },
   "dependencies": {
     "@prisma/client": "^6.2.1",

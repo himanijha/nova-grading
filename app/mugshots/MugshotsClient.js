@@ -1,368 +1,235 @@
 "use client";
 
-import { useMemo, useRef, useState } from "react";
+import { useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { RATINGS, ratingMeta } from "@/lib/ratings";
+import Link from "next/link";
+import { uploadPhoto } from "@/lib/photo-client";
+import GroupBadge from "../GroupBadge";
 import { Mugshot } from "../Mugshot";
 
-import { MAX_UPLOAD_BYTES, MAX_UPLOAD_LABEL } from "@/lib/upload";
-
-const MAX_RESULTS = 40;
-
-const matches = (a, q) => {
+const matches = (p, q) => {
   const s = q.trim().toLowerCase();
   if (!s) return true;
-  return [a.fullName, a.uclaEmail, a.majors, a.gradYear]
-    .filter(Boolean)
-    .some((v) => String(v).toLowerCase().includes(s));
+  return [p.fullName, p.uclaEmail, p.contactEmail].some((v) => v && v.toLowerCase().includes(s));
 };
 
-/** Search box + result list. Used twice on this page, independently. */
-function Picker({ id, label, applicants, selectedId, onSelect, query, onQuery }) {
-  const results = useMemo(
-    () => applicants.filter((a) => matches(a, query)).slice(0, MAX_RESULTS),
-    [applicants, query]
-  );
-
-  return (
-    <div className="mug-picker">
-      <label className="mug-label" htmlFor={id}>
-        {label}
-      </label>
-      <input
-        id={id}
-        className="inp"
-        placeholder="Search by name, email, major, or year"
-        value={query}
-        onChange={(e) => onQuery(e.target.value)}
-      />
-      <div className="mug-results">
-        {results.length === 0 && <div className="empty">No applicant matches that.</div>}
-        {results.map((a) => (
-          <button
-            key={a.id}
-            type="button"
-            className={`mug-result${a.id === selectedId ? " on" : ""}`}
-            onClick={() => onSelect(a.id)}
-          >
-            <Mugshot applicant={a} zoom={false} />
-            <span className="mug-result-text">
-              <strong>{a.fullName}</strong>
-              <span className="mug-sub">
-                {[a.gradYear, a.majors].filter(Boolean).join(" · ") || a.uclaEmail}
-              </span>
-            </span>
-            {a.myRating && (
-              <span className="mug-chip" title={ratingMeta(a.myRating.value)?.label}>
-                {ratingMeta(a.myRating.value)?.icon}
-              </span>
-            )}
-          </button>
-        ))}
-      </div>
-    </div>
-  );
-}
-
 /**
- * Shrink big camera images in the browser. A 4MB phone photo becomes a few
- * hundred KB, which keeps the database (and its backups) reasonable. Anything
- * the browser cannot decode — HEIC, most likely — is sent through untouched.
+ * The door. Built for one hand on a phone: search, tap the name, take the
+ * photo, read them their groups, next.
  */
-async function shrink(file, max = 900) {
-  if (!/^image\/(jpeg|png|webp)$/.test(file.type)) return file;
-  try {
-    const bmp = await createImageBitmap(file);
-    const scale = Math.min(1, max / Math.max(bmp.width, bmp.height));
-    if (scale === 1 && file.size < 900 * 1024) return file;
-
-    const canvas = document.createElement("canvas");
-    canvas.width = Math.round(bmp.width * scale);
-    canvas.height = Math.round(bmp.height * scale);
-    canvas.getContext("2d").drawImage(bmp, 0, 0, canvas.width, canvas.height);
-
-    const blob = await new Promise((r) => canvas.toBlob(r, "image/jpeg", 0.85));
-    if (!blob || blob.size >= file.size) return file;
-    return new File([blob], file.name.replace(/\.\w+$/, "") + ".jpg", {
-      type: "image/jpeg",
-    });
-  } catch {
-    return file;
-  }
-}
-
-export default function MugshotsClient({ grader, applicants }) {
+export default function MugshotsClient({ cohorts, cohortId, people }) {
   const router = useRouter();
+  const searchRef = useRef(null);
+  const [q, setQ] = useState("");
+  const [show, setShow] = useState("waiting");
+  const [openId, setOpenId] = useState(null);
 
-  // The two halves of the page are deliberately independent: you photograph
-  // people in one order and form opinions in another.
-  const [photoQuery, setPhotoQuery] = useState("");
-  const [photoId, setPhotoId] = useState(null);
-  const [rateQuery, setRateQuery] = useState("");
-  const [rateId, setRateId] = useState(null);
-
-  const byId = (id) => applicants.find((a) => a.id === id) || null;
-  const photoTarget = byId(photoId);
-  const rateTarget = byId(rateId);
-
-  const withPhoto = applicants.filter((a) => a.hasPhoto).length;
-
-  return (
-    <div className="page wide">
-      <h1>Mugshots</h1>
-      <p className="sub">
-        Put a face to an application, and say whether you want to interview
-        them. {withPhoto} of {applicants.length} have a photo.
-      </p>
-
-      <div className="mug-grid">
-        <section className="card">
-          <h3>Add a photo</h3>
-          <Picker
-            id="photo-search"
-            label="1. Find the applicant"
-            applicants={applicants}
-            selectedId={photoId}
-            onSelect={setPhotoId}
-            query={photoQuery}
-            onQuery={setPhotoQuery}
-          />
-          <PhotoDrop applicant={photoTarget} onDone={() => router.refresh()} />
-        </section>
-
-        <section className="card">
-          <h3>Rate an applicant</h3>
-          <Picker
-            id="rate-search"
-            label="1. Find the applicant"
-            applicants={applicants}
-            selectedId={rateId}
-            onSelect={setRateId}
-            query={rateQuery}
-            onQuery={setRateQuery}
-          />
-          <RatePanel
-            key={rateId || "none"}
-            grader={grader}
-            applicant={rateTarget}
-            onDone={() => router.refresh()}
-          />
-        </section>
-      </div>
-    </div>
-  );
-}
-
-/** Drag-and-drop (or click-to-browse) upload for the selected applicant. */
-function PhotoDrop({ applicant, onDone }) {
-  const inputRef = useRef(null);
-  const [over, setOver] = useState(false);
-  const [busy, setBusy] = useState(false);
-  const [msg, setMsg] = useState("");
-
-  async function upload(file) {
-    if (!applicant) return setMsg("Pick an applicant first.");
-    if (!file) return;
-    if (!file.type.startsWith("image/")) return setMsg("That is not an image.");
-
-    setBusy(true);
-    setMsg("Preparing…");
-    const prepared = await shrink(file);
-
-    // Checked here as well as on the server: an oversized body never reaches
-    // the route in production, so this is the only place the person sees why.
-    if (prepared.size > MAX_UPLOAD_BYTES) {
-      setBusy(false);
-      const mb = (prepared.size / 1024 / 1024).toFixed(1);
-      return setMsg(
-        /heic|heif/i.test(prepared.type)
-          ? `This iPhone photo is ${mb}MB and the browser cannot shrink HEIC. Save it as JPEG and try again (limit ${MAX_UPLOAD_LABEL}).`
-          : `Image is ${mb}MB; the limit is ${MAX_UPLOAD_LABEL}.`
-      );
-    }
-
-    setMsg("Uploading…");
-    const body = new FormData();
-    body.append("applicantId", applicant.id);
-    body.append("file", prepared);
-
-    const res = await fetch("/api/photo", { method: "POST", body });
-    const data = await res.json().catch(() => ({}));
-    setBusy(false);
-
-    if (!res.ok) return setMsg(data.error || "Upload failed.");
-    setMsg(`Saved — ${(data.byteSize / 1024).toFixed(0)}KB`);
-    onDone();
-  }
-
-  async function remove() {
-    if (!applicant) return;
-    setBusy(true);
-    await fetch("/api/photo", {
-      method: "DELETE",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ applicantId: applicant.id }),
-    });
-    setBusy(false);
-    setMsg("Photo removed.");
-    onDone();
-  }
-
-  return (
-    <div className="mug-step">
-      <div className="mug-label">2. Drop the photo</div>
-
-      {!applicant && <div className="empty">No applicant selected yet.</div>}
-
-      {applicant && (
-        <>
-          <div className="mug-target">
-            <Mugshot applicant={applicant} size={110} />
-            <div>
-              <strong>{applicant.fullName}</strong>
-              <div className="mug-sub">
-                {applicant.hasPhoto ? "Has a photo — uploading replaces it" : "No photo yet"}
-              </div>
-            </div>
-          </div>
-
-          <div
-            className={`dropzone${over ? " over" : ""}${busy ? " busy" : ""}`}
-            onDragOver={(e) => {
-              e.preventDefault();
-              setOver(true);
-            }}
-            onDragLeave={() => setOver(false)}
-            onDrop={(e) => {
-              e.preventDefault();
-              setOver(false);
-              upload(e.dataTransfer.files?.[0]);
-            }}
-            onClick={() => inputRef.current?.click()}
-            role="button"
-            tabIndex={0}
-            onKeyDown={(e) => {
-              if (e.key === "Enter" || e.key === " ") inputRef.current?.click();
-            }}
-          >
-            <input
-              ref={inputRef}
-              type="file"
-              accept="image/*"
-              hidden
-              onChange={(e) => upload(e.target.files?.[0])}
-            />
-            <span className="drop-big">Drag a photo here</span>
-            <span className="drop-small">or click to choose a file · max {MAX_UPLOAD_LABEL}</span>
-          </div>
-
-          <div className="btn-row">
-            {applicant.hasPhoto && (
-              <button className="btn" disabled={busy} onClick={remove}>
-                Remove photo
-              </button>
-            )}
-          </div>
-          <div className="save-note">{msg}</div>
-        </>
-      )}
-    </div>
-  );
-}
-
-/** The thumbs, plus the note that explains them. */
-function RatePanel({ grader, applicant, onDone }) {
-  const [value, setValue] = useState(applicant?.myRating?.value || null);
-  const [note, setNote] = useState(applicant?.myRating?.note || "");
-  const [busy, setBusy] = useState(false);
-  const [msg, setMsg] = useState("");
-
-  if (!applicant) {
+  if (cohorts.length === 0) {
     return (
-      <div className="mug-step">
-        <div className="mug-label">2. Give a verdict</div>
-        <div className="empty">No applicant selected yet.</div>
+      <div className="page">
+        <h1>Mugshots</h1>
+        <div className="card">No cohorts have been set up yet.</div>
       </div>
     );
   }
 
-  async function save(nextValue = value) {
-    setBusy(true);
-    const res = await fetch("/api/ratings", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ applicantId: applicant.id, value: nextValue, note }),
-    });
-    const data = await res.json().catch(() => ({}));
-    setBusy(false);
-    if (!res.ok) return setMsg(data.error || "Could not save.");
-    setMsg(nextValue === null ? "Rating cleared." : "Saved.");
-    onDone();
+  const arrived = people.filter((p) => p.checkedIn).length;
+  const photos = people.filter((p) => p.hasPhoto).length;
+  const open = people.find((p) => p.id === openId) || null;
+
+  const shown = people.filter(
+    (p) =>
+      matches(p, q) &&
+      // A search looks through everyone — the person in front of you may
+      // already be marked arrived by someone else.
+      (q.trim() || show === "all" || (show === "waiting" ? !p.checkedIn : p.checkedIn))
+  );
+
+  function next() {
+    setOpenId(null);
+    setQ("");
+    // Straight back to typing the next name.
+    setTimeout(() => searchRef.current?.focus(), 0);
   }
 
-  const others = applicant.ratings.filter((r) => r.graderName !== grader.name);
+  if (open) {
+    return <Person person={open} onBack={next} onChange={() => router.refresh()} />;
+  }
 
   return (
-    <div className="mug-step">
-      <div className="mug-label">2. Give a verdict</div>
-
-      <div className="mug-target">
-        <Mugshot applicant={applicant} size={110} />
-        <div>
-          <strong>{applicant.fullName}</strong>
-          <div className="mug-sub">
-            {[applicant.gradYear, applicant.majors].filter(Boolean).join(" · ")}
-          </div>
-        </div>
-      </div>
-
-      <div className="rate-row">
-        {RATINGS.map((r) => (
-          <button
-            key={r.value}
-            type="button"
-            className={`rate-btn${value === r.value ? " on" : ""}`}
-            aria-pressed={value === r.value}
-            title={r.label}
-            disabled={busy}
-            onClick={() => {
-              const next = value === r.value ? null : r.value;
-              setValue(next);
-              save(next);
-            }}
-          >
-            <span className="rate-icon">{r.icon}</span>
-            <span className="rate-text">{r.label}</span>
-          </button>
+    <div className="page checkin">
+      <h1>Mugshots</h1>
+      <p className="sub">
+        Photograph everyone as they arrive, so every grader has a face to put to the notes.
+      </p>
+      <div className="seg cohort-seg">
+        {cohorts.map((c) => (
+          <Link key={c.id} href={`/mugshots?cohort=${c.id}`} className={c.id === cohortId ? "on" : ""}>
+            {c.name}
+          </Link>
         ))}
       </div>
 
-      <textarea
-        className="inp"
-        placeholder="Why? (optional, but the rest of the team will thank you)"
-        value={note}
-        onChange={(e) => setNote(e.target.value)}
-      />
-      <div className="btn-row">
-        <button className="btn primary" disabled={busy || !value} onClick={() => save()}>
-          Save note
-        </button>
-      </div>
-      <div className="save-note">{msg}</div>
-
-      {others.length > 0 && (
-        <div className="graded-by">
-          <h4>Also rated by ({others.length})</h4>
-          {others.map((r, i) => (
-            <div className="grader-row" key={i}>
-              <span>
-                {ratingMeta(r.value)?.icon} {r.graderName}
-              </span>
-              <span className="mug-sub">{r.note || "no note"}</span>
-            </div>
-          ))}
+      <div className="checkin-stats">
+        <div>
+          <strong>{arrived}</strong>
+          <span>/ {people.length} arrived</span>
         </div>
-      )}
+        <div>
+          <strong>{photos}</strong>
+          <span>/ {people.length} photos</span>
+        </div>
+      </div>
+
+      <div className="checkin-search">
+        <input
+          ref={searchRef}
+          className="inp big"
+          type="search"
+          inputMode="search"
+          autoComplete="off"
+          placeholder="Search name or email"
+          value={q}
+          onChange={(e) => setQ(e.target.value)}
+        />
+        {!q.trim() && (
+          <div className="seg">
+            <button className={show === "waiting" ? "on" : ""} onClick={() => setShow("waiting")}>
+              Not here yet {people.length - arrived}
+            </button>
+            <button className={show === "arrived" ? "on" : ""} onClick={() => setShow("arrived")}>
+              Arrived {arrived}
+            </button>
+            <button className={show === "all" ? "on" : ""} onClick={() => setShow("all")}>
+              All
+            </button>
+          </div>
+        )}
+      </div>
+
+      <div className="checkin-list">
+        {people.length === 0 && <div className="empty">Nobody is in this cohort yet.</div>}
+        {people.length > 0 && shown.length === 0 && (
+          <div className="empty">{q.trim() ? "No one in this cohort matches that." : "Nobody here."}</div>
+        )}
+        {shown.map((p) => (
+          <button key={p.id} type="button" className="checkin-row" onClick={() => setOpenId(p.id)}>
+            <Mugshot applicant={p} size={48} zoom={false} />
+            <span className="checkin-name">
+              <strong>{p.fullName}</strong>
+              <span className="muted small">{p.uclaEmail}</span>
+            </span>
+            <span className="checkin-marks">
+              {!p.hasPhoto && <span className="mark need">No photo</span>}
+              {p.checkedIn && <span className="mark ok">✓ Here</span>}
+            </span>
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function Person({ person, onBack, onChange }) {
+  const cameraRef = useRef(null);
+  const libraryRef = useRef(null);
+  const [busy, setBusy] = useState(false);
+  const [msg, setMsg] = useState("");
+
+  async function setArrived(arrived) {
+    await fetch("/api/checkin", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ applicantId: person.id, arrived }),
+    });
+    onChange();
+  }
+
+  async function take(file) {
+    if (!file) return;
+    setBusy(true);
+    const r = await uploadPhoto(person.id, file, setMsg);
+    if (r.ok) {
+      setMsg("Photo saved.");
+      // Being photographed at the door is arriving.
+      if (!person.checkedIn) await setArrived(true);
+      else onChange();
+    } else {
+      setMsg(r.error);
+    }
+    setBusy(false);
+  }
+
+  return (
+    <div className="page checkin person">
+      <button type="button" className="back" onClick={onBack}>
+        ‹ Back to list
+      </button>
+
+      <div className="person-photo">
+        {person.hasPhoto ? (
+          <Mugshot applicant={person} size={220} />
+        ) : (
+          <button type="button" className="photo-empty" onClick={() => cameraRef.current?.click()}>
+            <span className="photo-empty-icon">📷</span>
+            <span>Tap to take their photo</span>
+          </button>
+        )}
+      </div>
+
+      <h1 className="person-name">{person.fullName}</h1>
+      <div className="muted center-text">
+        {[person.gradYear, person.majors].filter(Boolean).join(" · ") || person.uclaEmail}
+      </div>
+
+      {/* capture="environment" opens the back camera: you are photographing
+          the person in front of you, not yourself. */}
+      <input
+        ref={cameraRef}
+        type="file"
+        accept="image/*"
+        capture="environment"
+        hidden
+        onChange={(e) => take(e.target.files?.[0])}
+      />
+      <input ref={libraryRef} type="file" accept="image/*" hidden onChange={(e) => take(e.target.files?.[0])} />
+
+      <div className="stack person-actions">
+        <button className="btn primary big" disabled={busy} onClick={() => cameraRef.current?.click()}>
+          {busy ? msg || "Saving…" : person.hasPhoto ? "Retake photo" : "Take photo"}
+        </button>
+        <button className="btn" disabled={busy} onClick={() => libraryRef.current?.click()}>
+          Choose from library
+        </button>
+        {person.checkedIn ? (
+          <button className="btn" disabled={busy} onClick={() => setArrived(false)}>
+            ✓ Arrived — undo
+          </button>
+        ) : (
+          <button className="btn" disabled={busy} onClick={() => setArrived(true)}>
+            Mark arrived without a photo
+          </button>
+        )}
+      </div>
+      {!busy && msg && <div className="save-note center-text">{msg}</div>}
+
+      <section className="card schedule">
+        <h3>Their groups</h3>
+        {person.schedule.length === 0 ? (
+          <div className="muted">Rounds haven&apos;t been planned for this cohort yet.</div>
+        ) : (
+          person.schedule.map((s) => (
+            <div className="schedule-row" key={s.round}>
+              <span className="muted">Round {s.round}</span>
+              <GroupBadge group={s.group} size={22} />
+            </div>
+          ))
+        )}
+      </section>
+
+      <button className="btn primary big wide" onClick={onBack}>
+        Next person
+      </button>
     </div>
   );
 }

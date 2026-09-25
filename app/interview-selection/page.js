@@ -23,6 +23,16 @@ export default async function InterviewSelectionPage() {
       ratings: {
         select: { value: true, note: true, grader: { select: { name: true } } },
       },
+      // What graders jotted during the group work rounds, read alongside
+      // the thumbs they gave afterwards.
+      notes: {
+        orderBy: { createdAt: "asc" },
+        select: {
+          body: true,
+          grader: { select: { name: true } },
+          round: { select: { number: true } },
+        },
+      },
     },
   });
 
@@ -50,6 +60,11 @@ export default async function InterviewSelectionPage() {
       value: r.value,
       note: r.note,
       graderName: r.grader.name,
+    })),
+    eventNotes: a.notes.map((n) => ({
+      body: n.body,
+      graderName: n.grader.name,
+      round: n.round?.number ?? null,
     })),
   }));
 

@@ -52,6 +52,7 @@ export default async function RankingsPage() {
       gradYear: true,
       majors: true,
       roleCategory: true,
+      screeningStatus: true,
       grades: {
         select: {
           technical: true,
@@ -80,6 +81,7 @@ export default async function RankingsPage() {
       gradYear: normalizeGradYear(a.gradYear) || "Unknown",
       majors: a.majors,
       roleCategory: a.roleCategory,
+      screeningStatus: a.screeningStatus,
       reviewCount: a.grades.length,
       // What graders wrote while scoring, so the table can explain why someone
       // sits where they do without opening the grading screen. The thumbs
@@ -120,7 +122,7 @@ export default async function RankingsPage() {
   return (
     <>
       <Nav grader={grader} />
-      <RankingsClient applicants={applicants} />
+      <RankingsClient applicants={applicants} isAdmin={grader.isAdmin} />
     </>
   );
 }

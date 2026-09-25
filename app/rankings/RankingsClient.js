@@ -2,6 +2,7 @@
 
 import { Fragment, useMemo, useState } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { compareGradYears, gradYearParts, GRAD_YEAR_OPTIONS } from "@/lib/mapping";
 
 const ROLE_LABEL = {
@@ -12,6 +13,8 @@ const ROLE_LABEL = {
   UNKNOWN: "Not specified",
 };
 const ROLE_ORDER = ["DEVELOPER", "DESIGNER", "BOTH", "OTHER", "UNKNOWN"];
+
+const STATUS_LABEL = { PASSED: "Passed", REJECTED: "Not passed", PENDING: "Undecided" };
 
 const MAX_SCORE = 20;
 const DEFAULT_CUTOFF = 14;
@@ -112,7 +115,113 @@ function YearCutoff({ year, cutoff, above, total, onChange }) {
   );
 }
 
-export default function RankingsClient({ applicants }) {
+/**
+ * Turns the what-if cutoffs into a decision. Two steps, because it rewrites
+ * the screening result for everyone on screen, and the second step says
+ * exactly how many that is.
+ */
+function SaveResult({ shown, isAbove, counts, onSaved }) {
+  const [asking, setAsking] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const [msg, setMsg] = useState("");
+
+  const pass = shown.filter(isAbove).length;
+  const fail = shown.length - pass;
+
+  async function save() {
+    setBusy(true);
+    const res = await fetch("/api/screening", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        updates: shown.map((a) => ({
+          applicantId: a.id,
+          status: isAbove(a) ? "PASSED" : "REJECTED",
+        })),
+      }),
+    });
+    const data = await res.json().catch(() => ({}));
+    setBusy(false);
+    setAsking(false);
+    setMsg(res.ok ? `Saved ${data.saved} results.` : data.error || "Could not save.");
+    if (res.ok) onSaved();
+  }
+
+  return (
+    <div className="save-result">
+      <div className="bd-title">Screening result</div>
+      <div className="save-result-counts">
+        Saved so far: <strong>{counts.PASSED}</strong> passed ·{" "}
+        <strong>{counts.REJECTED}</strong> not passed · <strong>{counts.PENDING}</strong> undecided
+      </div>
+      {!asking ? (
+        <button
+          className="btn primary"
+          disabled={shown.length === 0}
+          onClick={() => {
+            setMsg("");
+            setAsking(true);
+          }}
+        >
+          Save these cutoffs as the result
+        </button>
+      ) : (
+        <div className="confirm-box">
+          <p>
+            Mark <strong>{pass}</strong> passed and <strong>{fail}</strong> not passed? Only the{" "}
+            {shown.length} graded applicants shown with the current filters change. Anyone marked
+            not passed leaves their group work cohort.
+          </p>
+          <div className="btn-row">
+            <button className="btn" disabled={busy} onClick={() => setAsking(false)}>
+              Cancel
+            </button>
+            <button className="btn primary" disabled={busy} onClick={save}>
+              {busy ? "Saving…" : "Yes, save"}
+            </button>
+          </div>
+        </div>
+      )}
+      <div className="save-note">{msg}</div>
+    </div>
+  );
+}
+
+/** One applicant's saved result; admins can change it in place. */
+function StatusCell({ applicant, isAdmin, onSaved }) {
+  const [busy, setBusy] = useState(false);
+  const status = applicant.screeningStatus;
+  if (!isAdmin) {
+    return <span className={`status-tag ${status.toLowerCase()}`}>{STATUS_LABEL[status]}</span>;
+  }
+  return (
+    <select
+      className={`status-select ${status.toLowerCase()}`}
+      value={status}
+      disabled={busy}
+      aria-label={`Screening result for ${applicant.fullName}`}
+      onChange={async (e) => {
+        setBusy(true);
+        await fetch("/api/screening", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ updates: [{ applicantId: applicant.id, status: e.target.value }] }),
+        });
+        setBusy(false);
+        onSaved();
+      }}
+    >
+      {Object.entries(STATUS_LABEL).map(([v, l]) => (
+        <option key={v} value={v}>
+          {l}
+        </option>
+      ))}
+    </select>
+  );
+}
+
+export default function RankingsClient({ applicants, isAdmin }) {
+  const router = useRouter();
   const [openNotes, setOpenNotes] = useState(null);
   const [minReviews, setMinReviews] = useState(1);
   const [roleFilter, setRoleFilter] = useState("all");
@@ -193,6 +302,9 @@ export default function RankingsClient({ applicants }) {
 
   const pct = graded.length ? Math.round((above.length / graded.length) * 100) : 0;
   const singleYear = yearFilter !== "all";
+
+  const statusCounts = { PASSED: 0, REJECTED: 0, PENDING: 0 };
+  for (const a of applicants) statusCounts[a.screeningStatus]++;
 
   return (
     <div className="page wide">
@@ -321,6 +433,15 @@ export default function RankingsClient({ applicants }) {
             </button>
           )}
         </div>
+
+        {isAdmin && (
+          <SaveResult
+            shown={graded}
+            isAbove={isAbove}
+            counts={statusCounts}
+            onSaved={() => router.refresh()}
+          />
+        )}
       </section>
 
       <section className="card">
@@ -346,6 +467,7 @@ export default function RankingsClient({ applicants }) {
                 <th className="num">Comm</th>
                 <th className="num">Reviews</th>
                 <th className="num">Notes</th>
+                <th>Result</th>
               </tr>
             </thead>
             <tbody>
@@ -354,7 +476,7 @@ export default function RankingsClient({ applicants }) {
                 // In a single-year view the list is one clean cut, so mark the line.
                 const showCut =
                   singleYear && !ok && (i === 0 || isAbove(graded[i - 1]));
-                const cols = singleYear ? 11 : 12;
+                const cols = singleYear ? 12 : 13;
                 return (
                   <Fragment key={a.id}>
                     {showCut && (
@@ -418,6 +540,13 @@ export default function RankingsClient({ applicants }) {
                         >
                           {a.noteCount === 0 ? "—" : `💬 ${a.noteCount}`}
                         </button>
+                      </td>
+                      <td>
+                        <StatusCell
+                          applicant={a}
+                          isAdmin={isAdmin}
+                          onSaved={() => router.refresh()}
+                        />
                       </td>
                     </tr>
                     {openNotes === a.id && (

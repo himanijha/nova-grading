@@ -6,7 +6,8 @@ import { usePathname, useRouter } from "next/navigation";
 
 /**
  * The nav follows the shape of the season: forms come in, applications get
- * read, the people who survive go to coffee chats. Grouping the pages that way
+ * read, the people who pass come to the group work event, and the people who
+ * shine there go to coffee chats. Grouping the pages that way
  * means a grader can find a page from the stage they are in, instead of
  * remembering which of seven flat links is the one they want.
  */
@@ -28,15 +29,33 @@ function navGroups(grader) {
       ],
     },
     {
+      key: "event",
+      label: "Group work",
+      // In the order the event runs: plan it, then on the day check people in
+      // (with their photo), take notes in your group, rate at the end.
+      items: [
+        { href: "/event", label: "Overview" },
+        grader?.isAdmin && { href: "/cohorts", label: "Cohorts" },
+        { href: "/groups", label: "Groups" },
+        { href: "/mugshots", label: "Mugshots" },
+        { href: "/my-group", label: "My group" },
+        { href: "/rate", label: "Rate" },
+      ].filter(Boolean),
+    },
+    {
       key: "coffee",
       label: "Coffee chats",
-      items: [
-        { href: "/mugshots", label: "Mugshots" },
-        { href: "/interview-selection", label: "Interview candidates" },
-      ],
+      items: [{ href: "/interview-selection", label: "Interview candidates" }],
     },
   ].filter((g) => !g.hidden);
 }
+
+// The three screens used standing up at the event, one thumb away on a phone.
+const TABS = [
+  { href: "/mugshots", label: "Mugshots", icon: "📷" },
+  { href: "/my-group", label: "My group", icon: "👥" },
+  { href: "/rate", label: "Rate", icon: "👍" },
+];
 
 export default function Nav({ grader }) {
   const path = usePathname();
@@ -70,13 +89,53 @@ export default function Nav({ grader }) {
   }
 
   const groups = navGroups(grader);
+  const current = groups.flatMap((g) => g.items).find((i) => i.href === path);
 
   return (
+    <>
     <nav className="nav" ref={navRef}>
-      <Link href="/grading" className="nav-brand">
+      {/* Phones: brand, where you are, and a menu with every page. */}
+      <div className="nav-mobile">
+        <Link href="/event" className="nav-brand">
+          NOVA
+        </Link>
+        <span className="nav-here">{current?.label || (path === "/settings" ? "Settings" : "")}</span>
+        <button
+          type="button"
+          className="nav-menu-btn"
+          aria-expanded={open === "sheet"}
+          aria-label="Menu"
+          onClick={() => setOpen((o) => (o === "sheet" ? null : "sheet"))}
+        >
+          {open === "sheet" ? "✕" : "☰"}
+        </button>
+        {open === "sheet" && (
+          <div className="nav-sheet">
+            {groups.map((g) => (
+              <div key={g.key} className="nav-sheet-group">
+                <div className="nav-sheet-title">{g.label}</div>
+                {g.items.map((i) => (
+                  <Link key={i.href} href={i.href} className={path === i.href ? "active" : ""}>
+                    {i.label}
+                  </Link>
+                ))}
+              </div>
+            ))}
+            <div className="nav-sheet-group">
+              <div className="nav-sheet-title">{grader?.name}</div>
+              <Link href="/settings">Settings</Link>
+              <button type="button" onClick={logout}>
+                Logout
+              </button>
+            </div>
+          </div>
+        )}
+      </div>
+
+      <Link href="/grading" className="nav-brand nav-desktop">
         NOVA
       </Link>
-      <div className="nav-links">
+      <div className="nav-links nav-desktop">
         {groups.map((g) => {
           const here = g.items.some((i) => i.href === path);
           return (
@@ -139,5 +198,16 @@ export default function Nav({ grader }) {
         </div>
       </div>
     </nav>
+    <div className="tabbar">
+      {TABS.map((t) => (
+        <Link key={t.href} href={t.href} className={path === t.href ? "on" : ""}>
+          <span className="tab-icon" aria-hidden="true">
+            {t.icon}
+          </span>
+          {t.label}
+        </Link>
+      ))}
+    </div>
+    </>
   );
 }

@@ -21,7 +21,10 @@ export function Mugshot({ applicant, size = 38, zoom = true }) {
 
   if (!applicant.hasPhoto) {
     return (
-      <span className="mug-avatar blank" style={{ width: size, height: size }}>
+      <span
+        className="mug-avatar blank"
+        style={{ width: size, height: size, fontSize: Math.max(11, Math.round(size * 0.3)) }}
+      >
         {initials}
       </span>
     );
