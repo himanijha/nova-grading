@@ -337,6 +337,18 @@ export default function InterviewClient({ applicants }) {
                               <span>{r.note || "No note."}</span>
                             </div>
                           ))}
+                          {a.eventNotes.length > 0 && (
+                            <div className="note-group">
+                              <div className="note-group-title">During group work</div>
+                              {a.eventNotes.map((n, k) => (
+                                <div className="note-line" key={k}>
+                                  <strong>{n.graderName}</strong>
+                                  {n.round != null && <span className="note-label">Round {n.round}</span>}
+                                  <span>{n.body}</span>
+                                </div>
+                              ))}
+                            </div>
+                          )}
                         </td>
                       </tr>
                     )}

@@ -1,60 +1,63 @@
 import { redirect } from "next/navigation";
 import { getCurrentGrader } from "@/lib/auth";
 import { prisma } from "@/lib/db";
+import { APPLICANT_CARD, cardView, defaultCohortId, listCohorts } from "@/lib/event";
+import { symbolMeta } from "@/lib/symbols";
 import Nav from "../Nav";
 import MugshotsClient from "./MugshotsClient";
 
 export const dynamic = "force-dynamic";
 
-export default async function MugshotsPage() {
+export default async function MugshotsPage({ searchParams }) {
   const grader = await getCurrentGrader();
   if (!grader) redirect("/login");
 
-  const rows = await prisma.applicant.findMany({
-    select: {
-      id: true,
-      fullName: true,
-      uclaEmail: true,
-      majors: true,
-      gradYear: true,
-      roleCategory: true,
-      // Never select `data` here: it would pull every photo's bytes into the
-      // page payload. The <img> fetches them one at a time instead.
-      photo: { select: { updatedAt: true, byteSize: true } },
-      ratings: {
-        select: {
-          value: true,
-          note: true,
-          graderId: true,
-          grader: { select: { name: true } },
-        },
-      },
-    },
-    orderBy: { fullName: "asc" },
-  });
+  const cohorts = await listCohorts();
+  const { cohort: asked } = await searchParams;
+  const cohortId = cohorts.some((c) => c.id === asked) ? asked : defaultCohortId(cohorts);
 
-  const applicants = rows.map((a) => ({
-    id: a.id,
-    fullName: a.fullName,
-    uclaEmail: a.uclaEmail,
-    majors: a.majors,
-    gradYear: a.gradYear,
-    roleCategory: a.roleCategory,
-    hasPhoto: !!a.photo,
-    // Cache-buster so a replaced photo shows immediately.
-    photoVersion: a.photo ? a.photo.updatedAt.getTime() : null,
-    myRating: a.ratings.find((r) => r.graderId === grader.id) || null,
-    ratings: a.ratings.map((r) => ({
-      value: r.value,
-      note: r.note,
-      graderName: r.grader.name,
-    })),
-  }));
+  let people = [];
+  if (cohortId) {
+    const [members, rounds] = await Promise.all([
+      prisma.cohortMember.findMany({
+        where: { cohortId },
+        select: { checkedInAt: true, applicant: { select: APPLICANT_CARD } },
+      }),
+      prisma.round.findMany({
+        where: { cohortId },
+        orderBy: { number: "asc" },
+        select: {
+          number: true,
+          placements: {
+            select: { applicantId: true, group: { select: { color: true, shape: true } } },
+          },
+        },
+      }),
+    ]);
+
+    // Each person's groups in round order, to read out at the door.
+    const schedule = (id) =>
+      rounds.map((r) => {
+        const p = r.placements.find((x) => x.applicantId === id);
+        return {
+          round: r.number,
+          group: p ? { ...p.group, name: symbolMeta(p.group.color, p.group.shape).name } : null,
+        };
+      });
+
+    people = members
+      .map((m) => ({
+        ...cardView(m.applicant),
+        checkedIn: !!m.checkedInAt,
+        schedule: schedule(m.applicant.id),
+      }))
+      .sort((a, b) => a.fullName.localeCompare(b.fullName));
+  }
 
   return (
     <>
       <Nav grader={grader} />
-      <MugshotsClient grader={grader} applicants={applicants} />
+      <MugshotsClient cohorts={cohorts} cohortId={cohortId} people={people} />
     </>
   );
 }

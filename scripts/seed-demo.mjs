@@ -59,8 +59,25 @@ for (const [name, email] of DEMO_GRADERS) {
 // grades below line up with how the responses actually read.
 const strengthByEmail = new Map();
 
+// Two demo applicants with the same name look like one person placed twice,
+// so names are drawn until they're new.
+const usedNames = new Set(
+  (await prisma.applicant.findMany({ select: { fullName: true } })).map((a) => a.fullName)
+);
+const freshName = () => {
+  // Past every combination, fall back to numbering rather than looping forever.
+  if (usedNames.size >= FIRST.length * LAST.length) return `${pick(FIRST)} ${pick(LAST)} ${usedNames.size}`;
+  for (;;) {
+    const name = `${pick(FIRST)} ${pick(LAST)}`;
+    if (!usedNames.has(name)) {
+      usedNames.add(name);
+      return name;
+    }
+  }
+};
+
 for (let i = 0; i < count; i++) {
-  const name = `${pick(FIRST)} ${pick(LAST)}`;
+  const name = freshName();
   const email = `demo${i}${DEMO_DOMAIN}`;
   const profile = PROFILES[i % PROFILES.length];
   const dedupeKey = crypto.createHash("sha256").update(email).digest("hex");

@@ -44,6 +44,9 @@ npm run build && npm start     # production build
 npm run seed:demo -- 60        # a specific number of fake applicants
 npm run seed:demo -- 24 wipe   # remove the previous demo data first
 npm run seed:demo -- 0 wipe    # clear demo data without adding more
+npm run seed:event             # a fake group work event on top of the demo applicants
+npm run seed:event -- wipe     # remove the fake event
+npm test                       # unit tests for cohort matching and group mixing
 ```
 
 Demo applicants use `@demo.ucla.edu` emails and demo graders use `@nova.demo`,
@@ -98,26 +101,66 @@ comment each, plus overall notes. **Save & Next** saves and jumps to the next
 applicant you haven't graded yet. Each grader has one grade per applicant;
 saving again updates it.
 
-**Mugshots** — attach a photo to an application by finding the applicant and
-dropping an image on the page. Photos are stored in the database rather than on
-disk, so they survive a redeploy and are included in a backup. Large images are
-shrunk in the browser before upload; the cap is 6MB. On the same page, you can
-record a verdict — double thumbs up, thumbs up, maybe, thumbs down — with a note
-saying why. One verdict per grader per applicant.
-
-**Interview selection** — ranks people by those verdicts and *ignores the
+**Interview candidates** — ranks people by the thumbs given on Rate after the
+group work event and *ignores the
 application scores entirely*. The number is the average across everyone who
 rated them: double thumbs up is 3, thumbs up 2, maybe 1, thumbs down 0. An
 average rather than a total, so someone three people loved is not buried by
 someone six people shrugged at — the rater count sits alongside so thin evidence
-stays visible. Click the thumbs in a row to read the notes.
+stays visible. Click the thumbs in a row to read their reasons and the notes
+written during group work.
+
+### The group work event
+
+**Group work → Overview** walks through the whole stage in order, with live
+progress for each step. On a phone, the nav folds into ☰ and a bottom tab bar
+holds the three screens used on the day: Mugshots, My group, Rate.
+
+After screening, the people who pass come to a one-hour group work session.
+Each session is a **cohort** (a time slot, ~100 people in one room). The hour
+has several **rounds**; each round splits the room into small groups named by a
+colour and shape — Green Circle, Blue Star, Yellow Triangle — and people move
+to a new symbol between rounds. Graders stay at one symbol for the whole hour.
+
+1. **Save the screening result (Rankings, admins).** Set the per-year cutoffs,
+   then *Save these cutoffs as the result*: everyone shown above their year's
+   cutoff is marked passed, everyone below not passed. The Result column lets
+   you override anyone by hand. Only passed applicants can go into a cohort.
+2. **Cohorts (admins).** Add one cohort per time slot. Send the people who
+   passed a form asking which times they can make, then upload its CSV here:
+   rows are matched to applicants by email, and each person is placed in one
+   slot they can make — people with the fewest options first, then the
+   emptiest slot, respecting any capacity. Review the proposal, change anyone,
+   and confirm; nothing is saved before that. Re-run it for late responses with
+   *leave people who are already in a cohort where they are*. A plain
+   `email, cohort` CSV works too. Anyone can also be moved by hand.
+3. **Groups (admins plan, everyone views).** Set how many groups the room has
+   and which graders sit at each symbol, then *Plan rounds*. Each round is mixed
+   against the earlier ones, so people meet new people and new graders. Drag
+   people between groups (or use ⇄), reshuffle one round, add or delete rounds.
+   *Schedule CSV* on the Cohorts page exports everyone's group for each round,
+   for the email telling them where to go.
+4. **Mugshots (phones).** At the door: search the name, tap, take the
+   photo with the back camera, so every grader has a face to put to their
+   notes. A photo marks them arrived. Anyone still missing one can be
+   photographed from their card on My group or Rate too. Their groups for each
+   round are shown so you can tell them in person.
+5. **My group (phones).** During the rounds: the symbol you're at, the faces
+   in your group this round, and a note box for each person. Every note is
+   signed with your name and stamped with the round and group automatically.
+6. **Rate.** After the last round: everyone you watched, the whole room's
+   notes about them, who saw them in which round, and your thumbs. These are
+   the same ratings Interview candidates ranks by, which picks the coffee
+   chats. Other graders' thumbs stay hidden until you give yours.
 
 **Settings** — change your own password. Admins also get the grader roster:
 add or remove graders, see grading progress, and generate password reset links.
 
 The nav groups these by stage: **Forms** (Import CSV, admins only),
-**Applications** (Grading, Rankings), **Coffee chats** (Mugshots, Interview
-candidates), then Settings.
+**Applications** (Grading, Rankings), **Group work** (Overview, Cohorts,
+Groups, Mugshots, My group, Rate), **Coffee chats** (Interview
+candidates),
+then Settings.
 
 ## Passwords
 
@@ -219,9 +262,13 @@ provider's own snapshots.
 
 ## Layout
 
-- `prisma/schema.prisma` — Grader, Applicant, Grade, PasswordResetToken
+- `prisma/schema.prisma` — Grader, Applicant, Grade, PasswordResetToken, plus
+  the event: Cohort, CohortMember, Group, GroupGrader, Round, Placement, Note
 - `prisma/migrations/` — schema history; apply with `prisma migrate deploy`
 - `lib/mapping.js` — CSV header matching, role categorising, Drive URL handling
+- `lib/grouping.js` — cohort matching and round mixing (pure; tested in `tests/`)
+- `lib/symbols.js` — the colour + shape each group goes by
+- `app/cohorts/`, `app/groups/`, `app/mugshots/`, `app/my-group/`, `app/rate/` — the event
 - `app/rankings/` — the ranking + cutoff screen
 - `app/grading/` — the grading screen
 - `app/import/` — CSV upload and column mapping, admins only

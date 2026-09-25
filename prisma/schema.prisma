@@ -20,6 +20,8 @@ model Grader {
   ratings      Rating[]
   photos       ApplicantPhoto[]
   resetTokens  PasswordResetToken[]
+  groups       GroupGrader[]
+  notes        Note[]
 }
 
 model PasswordResetToken {
@@ -59,11 +61,19 @@ model Applicant {
   raw           String   @default("{}")
   createdAt     DateTime @default(now())
 
+  // The outcome of the written round, saved from Rankings. Only PASSED people
+  // can be put in a cohort for the group work event.
+  screeningStatus String @default("PENDING") // PENDING | PASSED | REJECTED
+
   grades        Grade[]
   photo         ApplicantPhoto?
   ratings       Rating[]
+  cohort        CohortMember?
+  placements    Placement[]
+  notes         Note[]
 
   @@index([roleCategory])
+  @@index([screeningStatus])
 }
 
 // The mugshot. Stored in the database rather than on disk so it survives a
@@ -130,4 +140,113 @@ model Grade {
 
   @@unique([applicantId, graderId])
   @@index([applicantId])
+}
+
+// --- group work event --------------------------------------------------------
+//
+// A cohort is one hour-long time slot of the group work event. Everyone in it
+// is in the same room; each round splits the room into small symbol groups
+// ("Blue Star"), and people move to a new symbol between rounds.
+
+model Cohort {
+  id        String    @id @default(cuid())
+  name      String
+  startsAt  DateTime?
+  // Optional ceiling for the availability matcher. Null means no limit.
+  capacity  Int?
+  createdAt DateTime  @default(now())
+
+  members   CohortMember[]
+  groups    Group[]
+  rounds    Round[]
+}
+
+// Each passed applicant attends exactly one cohort.
+model CohortMember {
+  id          String    @id @default(cuid())
+  applicantId String    @unique
+  applicant   Applicant @relation(fields: [applicantId], references: [id], onDelete: Cascade)
+  cohortId    String
+  cohort      Cohort    @relation(fields: [cohortId], references: [id], onDelete: Cascade)
+  checkedInAt DateTime?
+  createdAt   DateTime  @default(now())
+
+  @@index([cohortId])
+}
+
+// A symbol group. It belongs to the cohort, not to a round: the symbols are
+// spots in the room, and people rotate through them.
+model Group {
+  id        String   @id @default(cuid())
+  cohortId  String
+  cohort    Cohort   @relation(fields: [cohortId], references: [id], onDelete: Cascade)
+  index     Int
+  color     String
+  shape     String
+
+  graders    GroupGrader[]
+  placements Placement[]
+  notes      Note[]
+
+  @@unique([cohortId, index])
+}
+
+// Graders stay at one symbol for the whole hour, so this has no round.
+// If graders start rotating between rounds, add a roundId here (and to the
+// unique key) and look it up per round wherever GroupGrader is read.
+model GroupGrader {
+  id       String @id @default(cuid())
+  groupId  String
+  group    Group  @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  graderId String
+  grader   Grader @relation(fields: [graderId], references: [id], onDelete: Cascade)
+
+  @@unique([groupId, graderId])
+  @@index([graderId])
+}
+
+model Round {
+  id       String @id @default(cuid())
+  cohortId String
+  cohort   Cohort @relation(fields: [cohortId], references: [id], onDelete: Cascade)
+  number   Int
+
+  placements Placement[]
+  notes      Note[]
+
+  @@unique([cohortId, number])
+}
+
+// Where one applicant sits in one round.
+model Placement {
+  id          String    @id @default(cuid())
+  roundId     String
+  round       Round     @relation(fields: [roundId], references: [id], onDelete: Cascade)
+  applicantId String
+  applicant   Applicant @relation(fields: [applicantId], references: [id], onDelete: Cascade)
+  groupId     String
+  group       Group     @relation(fields: [groupId], references: [id], onDelete: Cascade)
+
+  @@unique([roundId, applicantId])
+  @@index([groupId])
+}
+
+// What a grader noticed about someone. Written during the event, so it carries
+// the round and group it was written in; the verdict itself is a Rating.
+model Note {
+  id          String    @id @default(cuid())
+  applicantId String
+  applicant   Applicant @relation(fields: [applicantId], references: [id], onDelete: Cascade)
+  graderId    String
+  grader      Grader    @relation(fields: [graderId], references: [id], onDelete: Cascade)
+  roundId     String?
+  round       Round?    @relation(fields: [roundId], references: [id], onDelete: SetNull)
+  groupId     String?
+  group       Group?    @relation(fields: [groupId], references: [id], onDelete: SetNull)
+  body        String
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  @@index([applicantId])
+  @@index([graderId])
 }
