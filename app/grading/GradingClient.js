@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
+import { linkParts } from "@/lib/mapping";
 
 const MAX_ROWS = 250;
 
@@ -300,11 +301,17 @@ export default function GradingClient({
                 <Info label="Major(s)">{applicant.majors}</Info>
                 <Info label="Minor(s)">{applicant.minors}</Info>
                 <Info label="Links">
-                  {applicant.links ? (
-                    <a href={applicant.links} target="_blank" rel="noreferrer">
-                      {applicant.links}
-                    </a>
-                  ) : null}
+                  {applicant.links
+                    ? linkParts(applicant.links).map((part, i) =>
+                        part.href ? (
+                          <a key={i} href={part.href} target="_blank" rel="noreferrer">
+                            {part.text}
+                          </a>
+                        ) : (
+                          part.text
+                        )
+                      )
+                    : null}
                 </Info>
               </div>
             </section>

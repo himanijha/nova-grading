@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { roleCategory, normalizeGradYear, gradYearParts } from "../lib/mapping.js";
+import { roleCategory, normalizeGradYear, gradYearParts, linkParts } from "../lib/mapping.js";
 
 // Answers as they actually came in from the live form.
 test("short-form role answers are categorized", () => {
@@ -33,4 +33,28 @@ test("transfer answers keep which year they transfer in as", () => {
   assert.equal(normalizeGradYear("2029"), "2029");
   assert.equal(normalizeGradYear("2028 (Junior Transfer)"), "2028 (junior transfer)");
   assert.deepEqual(gradYearParts("2nd Year Transfer"), { year: "2nd year", transfer: true, label: "2nd Year Transfer" });
+});
+
+test("links without a scheme get https so they leave this site", () => {
+  assert.deepEqual(linkParts("erinteng.com"), [{ text: "erinteng.com", href: "https://erinteng.com" }]);
+  assert.deepEqual(linkParts("https://erinteng.com/"), [
+    { text: "https://erinteng.com/", href: "https://erinteng.com/" },
+  ]);
+  assert.deepEqual(linkParts("www.github.com/erin"), [
+    { text: "www.github.com/erin", href: "https://www.github.com/erin" },
+  ]);
+});
+
+test("several links in one answer each become a link", () => {
+  const links = linkParts("github.com/erin, linkedin.com/in/erin\nhttp://old.site").filter((p) => p.href);
+  assert.deepEqual(
+    links.map((p) => p.href),
+    ["https://github.com/erin", "https://linkedin.com/in/erin", "http://old.site"]
+  );
+});
+
+test("words, emails and trailing punctuation are not linked", () => {
+  const parts = linkParts("Portfolio: erinteng.com. Email erin@ucla.edu");
+  assert.deepEqual(parts.filter((p) => p.href), [{ text: "erinteng.com", href: "https://erinteng.com" }]);
+  assert.equal(parts.map((p) => p.text).join(""), "Portfolio: erinteng.com. Email erin@ucla.edu");
 });
