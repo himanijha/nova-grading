@@ -13,6 +13,9 @@ export default function ImportClient() {
   const [err, setErr] = useState("");
   const [result, setResult] = useState(null);
   const [busy, setBusy] = useState(false);
+  const [confirmingWipe, setConfirmingWipe] = useState(false);
+  const [wipeText, setWipeText] = useState("");
+  const [wiped, setWiped] = useState(null);
 
   function onFile(e) {
     const file = e.target.files?.[0];
@@ -46,6 +49,20 @@ export default function ImportClient() {
     setBusy(false);
     if (!res.ok) return setErr(data.error || "Import failed.");
     setResult(data);
+    router.refresh();
+  }
+
+  async function wipe() {
+    setErr("");
+    setBusy(true);
+    const res = await fetch("/api/import", { method: "DELETE" });
+    const data = await res.json();
+    setBusy(false);
+    if (!res.ok) return setErr(data.error || "Could not remove applications.");
+    setConfirmingWipe(false);
+    setWipeText("");
+    setResult(null);
+    setWiped(data.deleted);
     router.refresh();
   }
 
@@ -141,6 +158,62 @@ export default function ImportClient() {
           )}
         </div>
       )}
+
+      <div className="card" style={{ marginTop: 32, borderColor: "var(--danger)" }}>
+        <h3>Remove all applications</h3>
+        <p className="sub" style={{ margin: "0 0 12px" }}>
+          Deletes every applicant in the database along with all of their
+          grades, ratings and mugshots. This cannot be undone.
+        </p>
+        {wiped !== null && <p>Removed {wiped} applications.</p>}
+        {!confirmingWipe ? (
+          <button
+            className="btn"
+            style={{ color: "var(--danger)", borderColor: "var(--danger)" }}
+            disabled={busy}
+            onClick={() => {
+              setWiped(null);
+              setConfirmingWipe(true);
+            }}
+          >
+            Remove all applications…
+          </button>
+        ) : (
+          <div style={{ background: "var(--danger-soft)", padding: 12, borderRadius: 8 }}>
+            <p style={{ margin: "0 0 8px", color: "var(--danger)", fontWeight: 600 }}>
+              Warning: this permanently deletes every application and every grade.
+              Type DELETE to confirm.
+            </p>
+            <input
+              className="inp"
+              value={wipeText}
+              onChange={(e) => setWipeText(e.target.value)}
+              placeholder="DELETE"
+              autoFocus
+            />
+            <div className="btn-row">
+              <button
+                className="btn"
+                disabled={busy}
+                onClick={() => {
+                  setConfirmingWipe(false);
+                  setWipeText("");
+                }}
+              >
+                Cancel
+              </button>
+              <button
+                className="btn"
+                style={{ background: "var(--danger)", color: "#fff", borderColor: "var(--danger)" }}
+                disabled={busy || wipeText !== "DELETE"}
+                onClick={wipe}
+              >
+                {busy ? "Removing…" : "Permanently remove everything"}
+              </button>
+            </div>
+          </div>
+        )}
+      </div>
     </div>
   );
 }

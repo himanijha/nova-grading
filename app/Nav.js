@@ -16,7 +16,7 @@ function navGroups(grader) {
     {
       key: "forms",
       label: "Forms",
-      // Importing rewrites everybody's application; only admins do it.
+      // Importing and clearing applications is admin-only.
       hidden: !grader?.isAdmin,
       items: [{ href: "/import", label: "Import CSV" }],
     },

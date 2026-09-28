@@ -115,3 +115,13 @@ export async function POST(req) {
   return NextResponse.json({ ok: true, created, updated, unchanged, skipped });
 }
 
+// Wipes every application. Grades, ratings and mugshots cascade with them.
+export async function DELETE() {
+  const grader = await getCurrentGrader();
+  if (!grader) return NextResponse.json({ error: "Not signed in." }, { status: 401 });
+  if (!grader.isAdmin)
+    return NextResponse.json({ error: "Only admins can clear applications." }, { status: 403 });
+
+  const { count } = await prisma.applicant.deleteMany({});
+  return NextResponse.json({ ok: true, deleted: count });
+}
