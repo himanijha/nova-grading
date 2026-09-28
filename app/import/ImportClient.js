@@ -58,8 +58,9 @@ export default function ImportClient() {
         before importing.
       </p>
       <p className="sub admin-only">
-        Admins only. An import rewrites every application in the database, so
-        graders cannot run one.
+        Admins only. Applicants already in the database (matched by UCLA email)
+        get their responses refreshed if they resubmitted, but their grades and
+        ratings are never touched by an import.
       </p>
 
       <div className="card">
@@ -125,7 +126,8 @@ export default function ImportClient() {
         <div className="card" style={{ marginTop: 20 }}>
           <h3>Import complete</h3>
           <p>
-            {result.created} created, {result.updated} updated
+            {result.created} added, {result.updated} updated with newer
+            responses, {result.unchanged} unchanged
             {result.skipped.length > 0 && `, ${result.skipped.length} skipped`}.
           </p>
           {result.skipped.length > 0 && (
