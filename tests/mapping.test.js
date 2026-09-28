@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { roleCategory } from "../lib/mapping.js";
+import { roleCategory, normalizeGradYear, gradYearParts } from "../lib/mapping.js";
 
 // Answers as they actually came in from the live form.
 test("short-form role answers are categorized", () => {
@@ -24,4 +24,13 @@ test("ui/ux inside other words does not count as design", () => {
   assert.equal(roleCategory("I want to build things"), "OTHER");
   assert.equal(roleCategory("https://drive.google.com/open?id=18-UXzY44nIa2t33ndZV5sB2sIFTViRCV"), "OTHER");
   assert.equal(roleCategory(""), "UNKNOWN");
+});
+
+test("transfer answers keep which year they transfer in as", () => {
+  assert.equal(normalizeGradYear("1st Year Transfer"), "1st Year Transfer");
+  assert.equal(normalizeGradYear("2nd year transfer"), "2nd Year Transfer");
+  assert.equal(normalizeGradYear("Transfer"), "Transfer");
+  assert.equal(normalizeGradYear("2029"), "2029");
+  assert.equal(normalizeGradYear("2028 (Junior Transfer)"), "2028 (junior transfer)");
+  assert.deepEqual(gradYearParts("2nd Year Transfer"), { year: "2nd year", transfer: true, label: "2nd Year Transfer" });
 });

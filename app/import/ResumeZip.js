@@ -58,6 +58,8 @@ export default function ResumeZip({ applicants }) {
           type,
           problem,
           applicantId: problem ? "" : matchResume(name, applicants)?.id || "",
+          // Applicants who already have a resume are left alone unless asked.
+          replace: false,
           status: "",
         };
       })
@@ -66,8 +68,17 @@ export default function ResumeZip({ applicants }) {
     if (list.length === 0) return setMsg("No files found in that zip.");
     setFiles(list);
     const matched = list.filter((f) => f.applicantId).length;
-    setMsg(`${list.length} files found, ${matched} matched automatically. Check the matches below.`);
+    const already = list.filter((f) => hasResume.has(f.applicantId)).length;
+    setMsg(
+      `${list.length} files found, ${matched} matched automatically` +
+        (already ? `, ${already} of them already have a resume and will be skipped` : "") +
+        ". Check the matches below."
+    );
   }
+
+  const hasResume = new Set(applicants.filter((a) => a.hasResume).map((a) => a.id));
+  const willUpload = (f) =>
+    f.applicantId && !f.problem && f.status !== "Saved" && (f.replace || !hasResume.has(f.applicantId));
 
   const setRow = (i, patch) =>
     setFiles((fs) => fs.map((f, j) => (j === i ? { ...f, ...patch } : f)));
@@ -78,7 +89,7 @@ export default function ResumeZip({ applicants }) {
     let failed = 0;
     for (let i = 0; i < files.length; i++) {
       const f = files[i];
-      if (!f.applicantId || f.problem || f.status === "Saved") continue;
+      if (!willUpload(f)) continue;
       setRow(i, { status: "Uploading…" });
       const body = new FormData();
       body.append("applicantId", f.applicantId);
@@ -100,9 +111,9 @@ export default function ResumeZip({ applicants }) {
 
   // Two files pointed at the same person would silently overwrite each other.
   const counts = {};
-  for (const f of files || []) if (f.applicantId) counts[f.applicantId] = (counts[f.applicantId] || 0) + 1;
+  for (const f of files || []) if (willUpload(f)) counts[f.applicantId] = (counts[f.applicantId] || 0) + 1;
   const clashes = Object.values(counts).some((c) => c > 1);
-  const ready = (files || []).filter((f) => f.applicantId && !f.problem && f.status !== "Saved").length;
+  const ready = (files || []).filter(willUpload).length;
   const withResume = applicants.filter((a) => a.hasResume).length;
   const sorted = [...applicants].sort((a, b) => a.fullName.localeCompare(b.fullName));
 
@@ -113,7 +124,8 @@ export default function ResumeZip({ applicants }) {
         In Google Drive, download the form&rsquo;s resume upload folder as a zip and
         drop it here. Each file is matched to an applicant by name; fix any that
         are wrong before uploading. {withResume} of {applicants.length} applicants
-        have a resume so far. Re-uploading replaces a resume.
+        have a resume so far. Applicants who already have one are skipped unless
+        you tick replace.
       </p>
 
       <div
@@ -173,7 +185,7 @@ export default function ResumeZip({ applicants }) {
                         className="inp"
                         value={f.applicantId}
                         disabled={busy}
-                        onChange={(e) => setRow(i, { applicantId: e.target.value, status: "" })}
+                        onChange={(e) => setRow(i, { applicantId: e.target.value, replace: false, status: "" })}
                         style={counts[f.applicantId] > 1 ? { borderColor: "var(--danger)" } : undefined}
                       >
                         <option value="">— don&rsquo;t upload —</option>
@@ -185,7 +197,20 @@ export default function ResumeZip({ applicants }) {
                       </select>
                     )}
                   </td>
-                  <td>{f.status}</td>
+                  <td>
+                    {f.status ||
+                      (hasResume.has(f.applicantId) && (
+                        <label style={{ display: "inline-flex", gap: 6, alignItems: "center" }}>
+                          <input
+                            type="checkbox"
+                            checked={f.replace}
+                            disabled={busy}
+                            onChange={(e) => setRow(i, { replace: e.target.checked })}
+                          />
+                          {f.replace ? "Will replace existing" : "Already has one · replace"}
+                        </label>
+                      ))}
+                  </td>
                 </tr>
               ))}
             </tbody>
