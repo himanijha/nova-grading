@@ -28,8 +28,10 @@ const clean = (v) => {
 // older, so a row without one still refreshes the applicant.
 const isOlder = (a, b) => Boolean(a && b && a.getTime() < b.getTime());
 
+// roleCategory is included so a re-import picks up changes to how roles are
+// categorized, not just changes to the answers.
 const sameResponses = (existing, data) =>
-  ["fullName", ...TEXT_FIELDS].every((f) => (existing[f] ?? null) === data[f]) &&
+  ["fullName", "roleCategory", ...TEXT_FIELDS].every((f) => (existing[f] ?? null) === data[f]) &&
   (existing.submittedAt?.getTime() ?? null) === (data.submittedAt?.getTime() ?? null);
 
 export async function POST(req) {
