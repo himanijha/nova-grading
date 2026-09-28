@@ -44,20 +44,28 @@ function Breakdown({ title, rows, total }) {
   );
 }
 
-/**
- * What each grader wrote on the grading page, per criterion. The thumbs notes
- * from Mugshots belong to the interview round and are read there instead.
- */
-function Notes({ applicant }) {
-  const { graderNotes } = applicant;
+const CRITERIA = [
+  { key: "technical", label: "Tech" },
+  { key: "thoughtfulness", label: "Thought" },
+  { key: "initiative", label: "Init" },
+  { key: "communityFit", label: "Comm" },
+];
 
-  if (graderNotes.length === 0) {
-    return <div className="note-line">Nobody has written anything yet.</div>;
+/**
+ * Every grader's scores and what they wrote on the grading page, per
+ * criterion. The thumbs notes from Mugshots belong to the interview round and
+ * are read there instead.
+ */
+function Reviews({ applicant }) {
+  const { reviews } = applicant;
+
+  if (reviews.length === 0) {
+    return <div className="note-line">Nobody has reviewed this applicant yet.</div>;
   }
 
   return (
     <>
-      {graderNotes.map((g, n) => (
+      {reviews.map((g, n) => (
         <div className="note-group" key={n}>
           <div className="note-group-title">
             {g.autoDecision && (
@@ -67,13 +75,20 @@ function Notes({ applicant }) {
             )}
             {g.graderName} · {g.total}/{MAX_SCORE}
           </div>
+          <div className="review-scores">
+            {CRITERIA.map((c) => (
+              <span key={c.key}>
+                {c.label} <strong>{g.scores[c.key]}</strong>
+              </span>
+            ))}
+          </div>
           {g.notes.map((note) => (
             <div className="note-line" key={note.label}>
               <span className="note-label">{note.label}</span>
               <span>{note.text}</span>
             </div>
           ))}
-          {g.notes.length === 0 && (
+          {g.notes.length === 0 && g.autoDecision && (
             <div className="note-line">
               <span>No reason given.</span>
             </div>
@@ -524,7 +539,17 @@ export default function RankingsClient({ applicants, isAdmin }) {
                       <td className="num">{a.criteria.thoughtfulness.toFixed(1)}</td>
                       <td className="num">{a.criteria.initiative.toFixed(1)}</td>
                       <td className="num">{a.criteria.communityFit.toFixed(1)}</td>
-                      <td className="num">{a.reviewCount}</td>
+                      <td className="num">
+                        <button
+                          type="button"
+                          className="note-btn"
+                          aria-expanded={openNotes === a.id}
+                          title="See each grader's scores"
+                          onClick={() => setOpenNotes(openNotes === a.id ? null : a.id)}
+                        >
+                          {a.reviewCount} {openNotes === a.id ? "▴" : "▾"}
+                        </button>
+                      </td>
                       <td className="num">
                         <button
                           type="button"
@@ -552,7 +577,7 @@ export default function RankingsClient({ applicants, isAdmin }) {
                     {openNotes === a.id && (
                       <tr className="note-row">
                         <td colSpan={cols}>
-                          <Notes applicant={a} />
+                          <Reviews applicant={a} />
                         </td>
                       </tr>
                     )}

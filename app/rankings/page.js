@@ -83,20 +83,24 @@ export default async function RankingsPage() {
       roleCategory: a.roleCategory,
       screeningStatus: a.screeningStatus,
       reviewCount: a.grades.length,
-      // What graders wrote while scoring, so the table can explain why someone
-      // sits where they do without opening the grading screen. The thumbs
-      // notes from Mugshots stay out of it — that is the interview round, and
-      // this page ranks the application. A grader with an auto decision is
-      // kept even when they wrote nothing — their verdict is the thing that
-      // needs explaining.
-      graderNotes: a.grades
+      // Every review, with its scores and what the grader wrote while scoring,
+      // so the table can explain why someone sits where they do without
+      // opening the grading screen. The thumbs notes from Mugshots stay out of
+      // it — that is the interview round, and this page ranks the application.
+      reviews: a.grades
         .map((g) => ({
           graderName: g.grader.name,
+          scores: {
+            technical: g.technical,
+            thoughtfulness: g.thoughtfulness,
+            initiative: g.initiative,
+            communityFit: g.communityFit,
+          },
           total: g.technical + g.thoughtfulness + g.initiative + g.communityFit,
           autoDecision: g.autoDecision,
           notes: notesFrom(g),
         }))
-        .filter((g) => g.notes.length > 0 || g.autoDecision),
+        .sort((x, y) => y.total - x.total || x.graderName.localeCompare(y.graderName)),
       override: overrideFor(a.grades),
       noteCount: a.grades.reduce((n, g) => n + notesFrom(g).length, 0),
       average: totals.length ? Number(avg(totals).toFixed(2)) : null,
