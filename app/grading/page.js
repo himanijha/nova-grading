@@ -2,6 +2,7 @@ import { redirect } from "next/navigation";
 import { getCurrentGrader } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import { drivePreviewUrl } from "@/lib/mapping";
+import { EMBEDDABLE } from "@/lib/resumes";
 import Nav from "../Nav";
 import GradingClient from "./GradingClient";
 
@@ -73,6 +74,7 @@ export default async function GradingPage({ searchParams }) {
           include: { grader: { select: { id: true, name: true, email: true } } },
           orderBy: { updatedAt: "desc" },
         },
+        resume: { select: { mimeType: true, fileName: true, updatedAt: true } },
       },
     });
 
@@ -98,8 +100,18 @@ export default async function GradingPage({ searchParams }) {
         roleRaw: a.roleRaw,
         roleCategory: a.roleCategory,
         submittedAt: a.submittedAt ? a.submittedAt.toISOString() : null,
-        resumeUrl: a.resumeUrl,
-        resumeEmbedUrl: drivePreviewUrl(a.resumeUrl),
+        // An uploaded resume wins over the Drive link, which only opens for
+        // people the file was shared with.
+        ...(a.resume
+          ? (() => {
+              const url = `/api/resume/${a.id}?v=${a.resume.updatedAt.getTime()}`;
+              return {
+                resumeUrl: url,
+                resumeEmbedUrl: EMBEDDABLE.includes(a.resume.mimeType) ? url : null,
+                resumeFileName: a.resume.fileName,
+              };
+            })()
+          : { resumeUrl: a.resumeUrl, resumeEmbedUrl: drivePreviewUrl(a.resumeUrl) }),
         qLookingForward: a.qLookingForward,
         qInitiative: a.qInitiative,
         qCommunity: a.qCommunity,

@@ -344,6 +344,10 @@ export default function GradingClient({
                     </a>
                   </div>
                 </>
+              ) : applicant.resumeFileName ? (
+                <a href={applicant.resumeUrl} target="_blank" rel="noreferrer">
+                  Download {applicant.resumeFileName} ↗
+                </a>
               ) : (
                 <div className="empty">No resume link on this application.</div>
               )}

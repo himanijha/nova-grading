@@ -5,7 +5,7 @@ import Papa from "papaparse";
 import { useRouter } from "next/navigation";
 import { FIELDS, autoMap } from "@/lib/mapping";
 
-export default function ImportClient() {
+export default function ImportClient({ resumes }) {
   const router = useRouter();
   const [headers, setHeaders] = useState(null);
   const [rows, setRows] = useState([]);
@@ -158,6 +158,8 @@ export default function ImportClient() {
           )}
         </div>
       )}
+
+      {resumes}
 
       <div className="card" style={{ marginTop: 32, borderColor: "var(--danger)" }}>
         <h3>Remove all applications</h3>

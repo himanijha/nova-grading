@@ -19,6 +19,7 @@ model Grader {
   grades       Grade[]
   ratings      Rating[]
   photos       ApplicantPhoto[]
+  resumes      ApplicantResume[]
   resetTokens  PasswordResetToken[]
   groups       GroupGrader[]
   notes        Note[]
@@ -67,6 +68,7 @@ model Applicant {
 
   grades        Grade[]
   photo         ApplicantPhoto?
+  resume        ApplicantResume?
   ratings       Rating[]
   cohort        CohortMember?
   placements    Placement[]
@@ -87,6 +89,23 @@ model ApplicantPhoto {
 
   data         Bytes
   mimeType     String
+  byteSize     Int
+  uploadedById String?
+  uploadedBy   Grader?  @relation(fields: [uploadedById], references: [id], onDelete: SetNull)
+  updatedAt    DateTime @updatedAt
+}
+
+// The resume, uploaded from the zip of Google Form file responses. Kept in the
+// database for the same reasons as the photo: the Drive links in the CSV only
+// open for people the files were shared with, and hosted filesystems vanish.
+model ApplicantResume {
+  id           String   @id @default(cuid())
+  applicantId  String   @unique
+  applicant    Applicant @relation(fields: [applicantId], references: [id], onDelete: Cascade)
+
+  data         Bytes
+  mimeType     String
+  fileName     String
   byteSize     Int
   uploadedById String?
   uploadedBy   Grader?  @relation(fields: [uploadedById], references: [id], onDelete: SetNull)
