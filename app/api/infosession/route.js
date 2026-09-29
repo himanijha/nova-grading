@@ -1,13 +1,12 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { bad, gate } from "@/lib/event";
-
-const EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+import { EMAIL, planImport } from "@/lib/infosession-match";
 
 /**
  * { rows: [{ name, email }] } — the sign-in sheet. Admins only, like the
- * application import. Someone already on the list keeps their note and auto
- * accept; only their name is refreshed.
+ * application import. Someone already on the list — by email, or added by
+ * hand under the same name — keeps their note and auto accept.
  */
 export async function POST(req) {
   const { error } = await gate({ admin: true });
@@ -30,27 +29,36 @@ export async function POST(req) {
   });
 
   const existing = await prisma.infoSessionAttendee.findMany({
-    where: { email: { in: [...byEmail.keys()] } },
-    select: { email: true, name: true },
+    select: { id: true, email: true, name: true, onSheet: true },
   });
-  const had = new Map(existing.map((p) => [p.email, p.name]));
+  const plan = planImport(
+    [...byEmail].map(([email, name]) => ({ email, name })),
+    existing
+  );
 
-  let created = 0;
-  let updated = 0;
-  let unchanged = 0;
-  for (const [email, name] of byEmail) {
-    if (!had.has(email)) {
-      await prisma.infoSessionAttendee.create({ data: { email, name } });
-      created++;
-    } else if (had.get(email) !== name) {
-      await prisma.infoSessionAttendee.update({ where: { email }, data: { name } });
-      updated++;
-    } else {
-      unchanged++;
+  const counts = { created: 0, updated: 0, merged: 0, unchanged: 0 };
+  await prisma.$transaction(async (tx) => {
+    for (const p of plan) {
+      if (p.kind === "create") {
+        await tx.infoSessionAttendee.create({
+          data: { email: p.email, name: p.name, onSheet: true },
+        });
+        counts.created++;
+      } else if (p.kind === "unchanged") {
+        counts.unchanged++;
+      } else {
+        await tx.infoSessionAttendee.update({
+          where: { id: p.id },
+          data: { email: p.email, name: p.name, onSheet: true },
+        });
+        counts[p.kind === "merge" ? "merged" : "updated"]++;
+      }
     }
-  }
+    // A whole sheet of new people is a few hundred writes; the default five
+    // seconds is cut close on a hosted database.
+  }, { timeout: 30000 });
 
-  return NextResponse.json({ ok: true, created, updated, unchanged, skipped });
+  return NextResponse.json({ ok: true, ...counts, skipped });
 }
 
 /**

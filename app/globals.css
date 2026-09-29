@@ -1475,3 +1475,4 @@ input.inp.big { font-size: 17px; padding: 14px 16px; border-radius: 12px; backgr
 .infosess-note textarea { width: 100%; min-height: 110px; }
 .note-group.infosess-review { background: #fffbeb; border-radius: 8px; padding: 6px 8px; }
 .infosess-note .auto-block { margin-top: 16px; }
+.infosess-add { margin-top: 14px; }
