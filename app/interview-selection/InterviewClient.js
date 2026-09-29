@@ -5,6 +5,7 @@ import Link from "next/link";
 import { RATINGS, ratingMeta } from "@/lib/ratings";
 import { compareGradYears, gradYearParts, GRAD_YEAR_OPTIONS } from "@/lib/mapping";
 import { Mugshot } from "../Mugshot";
+import InfoStar from "../InfoStar";
 
 const ROLE_LABEL = {
   DEVELOPER: "Developer",
@@ -295,6 +296,7 @@ export default function InterviewClient({ applicants }) {
                       </td>
                       <td className="rank-name">
                         <Link href={`/grading?id=${a.id}`}>{a.fullName}</Link>
+                        {a.infoSession && <InfoStar size={16} />}
                         <Link className="app-link" href={`/grading?id=${a.id}`}>
                           application ↗
                         </Link>

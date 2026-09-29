@@ -1460,3 +1460,18 @@ input.inp.big { font-size: 17px; padding: 14px 16px; border-radius: 12px; backgr
   font-size: 16px;
   font-variant-numeric: tabular-nums;
 }
+
+/* Info session ------------------------------------------------------------ */
+.info-star {
+  display: inline-block;
+  vertical-align: -3px;
+  margin-left: 5px;
+  flex-shrink: 0;
+}
+.info-star path { fill: #f59e0b; }
+.info-star text { fill: #fff; font: 700 10px -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; }
+.infosess .person-name { display: flex; align-items: center; justify-content: center; gap: 2px; }
+.infosess-note { margin-top: 16px; }
+.infosess-note textarea { width: 100%; min-height: 110px; }
+.note-group.infosess-review { background: #fffbeb; border-radius: 8px; padding: 6px 8px; }
+.infosess-note .auto-block { margin-top: 16px; }

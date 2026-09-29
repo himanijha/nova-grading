@@ -3,6 +3,7 @@ import { getCurrentGrader } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import { drivePreviewUrl } from "@/lib/mapping";
 import { EMBEDDABLE } from "@/lib/resumes";
+import { infoSessionByApplicant } from "@/lib/infosession";
 import Nav from "../Nav";
 import GradingClient from "./GradingClient";
 
@@ -28,16 +29,21 @@ export default async function GradingPage({ searchParams }) {
     ];
   }
 
-  const rows = await prisma.applicant.findMany({
-    where,
-    select: {
-      id: true,
-      fullName: true,
-      submittedAt: true,
-      roleCategory: true,
-      grades: { select: { graderId: true } },
-    },
-  });
+  const [rows, infoSession] = await Promise.all([
+    prisma.applicant.findMany({
+      where,
+      select: {
+        id: true,
+        fullName: true,
+        submittedAt: true,
+        roleCategory: true,
+        grades: { select: { graderId: true } },
+      },
+    }),
+    // Only the star: the info session note and auto accept are read in
+    // Rankings, so they can't anchor anyone's own scores here.
+    infoSessionByApplicant(),
+  ]);
 
   const list = rows.map((a) => ({
     id: a.id,
@@ -46,6 +52,7 @@ export default async function GradingPage({ searchParams }) {
     roleCategory: a.roleCategory,
     reviewCount: a.grades.length,
     gradedByMe: a.grades.some((g) => g.graderId === grader.id),
+    infoSession: infoSession.has(a.id),
   }));
 
   list.sort((a, b) => {
@@ -91,6 +98,7 @@ export default async function GradingPage({ searchParams }) {
       applicant = {
         id: a.id,
         fullName: a.fullName,
+        infoSession: infoSession.has(a.id),
         uclaEmail: a.uclaEmail,
         contactEmail: a.contactEmail,
         pronouns: a.pronouns,

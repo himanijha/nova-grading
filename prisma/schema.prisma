@@ -23,6 +23,7 @@ model Grader {
   resetTokens  PasswordResetToken[]
   groups       GroupGrader[]
   notes        Note[]
+  infoSessionEdits InfoSessionAttendee[]
 }
 
 model PasswordResetToken {
@@ -268,4 +269,27 @@ model Note {
 
   @@index([applicantId])
   @@index([graderId])
+}
+
+// --- info session ------------------------------------------------------------
+//
+// Someone who came to an info session, from the sign-in sheet CSV. Not linked
+// to an Applicant by id: most people come before they apply, so the match is
+// made by email (or failing that, name) whenever a page reads them — see
+// lib/infosession.js. That way a later application is picked up on its own.
+model InfoSessionAttendee {
+  id          String   @id @default(cuid())
+  email       String   @unique // lowercased
+  name        String
+
+  // Shown in Rankings next to the graders' reviews.
+  note        String?
+  // Counts in Rankings exactly like an auto accept from the grading page.
+  // Requires a note, for the same reason.
+  autoAccept  Boolean  @default(false)
+  updatedById String?
+  updatedBy   Grader?  @relation(fields: [updatedById], references: [id], onDelete: SetNull)
+
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
 }

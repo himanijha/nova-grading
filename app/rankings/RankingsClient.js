@@ -4,6 +4,7 @@ import { Fragment, useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { compareGradYears, gradYearParts, GRAD_YEAR_OPTIONS } from "@/lib/mapping";
+import InfoStar from "../InfoStar";
 
 const ROLE_LABEL = {
   DEVELOPER: "Developer",
@@ -53,18 +54,36 @@ const CRITERIA = [
 
 /**
  * Every grader's scores and what they wrote on the grading page, per
- * criterion. The thumbs notes from Mugshots belong to the interview round and
- * are read there instead.
+ * criterion, after the note from the info session page if there is one. The
+ * thumbs notes from Mugshots belong to the interview round and are read there
+ * instead.
  */
 function Reviews({ applicant }) {
-  const { reviews } = applicant;
+  const { reviews, infoSession } = applicant;
+  const info = infoSession && (infoSession.note || infoSession.autoAccept) && (
+    <div className="note-group infosess-review">
+      <div className="note-group-title">
+        {infoSession.autoAccept && <span className="dtag accept">auto accept</span>}
+        Info session{infoSession.byName ? ` · ${infoSession.byName}` : ""}
+      </div>
+      <div className="note-line">
+        <span>{infoSession.note || "No note."}</span>
+      </div>
+    </div>
+  );
 
   if (reviews.length === 0) {
-    return <div className="note-line">Nobody has reviewed this applicant yet.</div>;
+    return (
+      <>
+        {info}
+        <div className="note-line">Nobody has reviewed this applicant yet.</div>
+      </>
+    );
   }
 
   return (
     <>
+      {info}
       {reviews.map((g, n) => (
         <div className="note-group" key={n}>
           <div className="note-group-title">
@@ -268,9 +287,10 @@ export default function RankingsClient({ applicants, isAdmin }) {
     () =>
       applicants.filter(
         (a) =>
-          a.average !== null &&
           // An overridden applicant is decided, so no further reviews are
-          // wanted — don't hide them behind the minimum-reviews filter.
+          // wanted — don't hide them behind the minimum-reviews filter. An
+          // info session auto accept can decide someone with no reviews at all.
+          (a.average !== null || a.override) &&
           (a.reviewCount >= minReviews || a.override) &&
           (roleFilter === "all" || a.roleCategory === roleFilter) &&
           (yearFilter === "all" || a.gradYear === yearFilter)
@@ -281,6 +301,7 @@ export default function RankingsClient({ applicants, isAdmin }) {
   const ungradedCount = applicants.filter(
     (a) =>
       a.average === null &&
+      !a.override &&
       (roleFilter === "all" || a.roleCategory === roleFilter) &&
       (yearFilter === "all" || a.gradYear === yearFilter)
   ).length;
@@ -505,6 +526,7 @@ export default function RankingsClient({ applicants, isAdmin }) {
                       <td className="num">{i + 1}</td>
                       <td className="rank-name">
                         <Link href={`/grading?id=${a.id}`}>{a.fullName}</Link>
+                        {a.infoSession && <InfoStar size={16} />}{" "}
                         {a.override && (
                           <button
                             type="button"
@@ -527,7 +549,7 @@ export default function RankingsClient({ applicants, isAdmin }) {
                       <td>{a.gradYear}</td>
                       <td className="num">
                         <strong className={a.override && a.override !== "CONFLICT" ? "overridden" : ""}>
-                          {a.average.toFixed(2)}
+                          {a.average === null ? "—" : a.average.toFixed(2)}
                         </strong>
                       </td>
                       {!singleYear && (
@@ -535,10 +557,11 @@ export default function RankingsClient({ applicants, isAdmin }) {
                           {cutoffFor(a.gradYear).toFixed(2)}
                         </td>
                       )}
-                      <td className="num">{a.criteria.technical.toFixed(1)}</td>
-                      <td className="num">{a.criteria.thoughtfulness.toFixed(1)}</td>
-                      <td className="num">{a.criteria.initiative.toFixed(1)}</td>
-                      <td className="num">{a.criteria.communityFit.toFixed(1)}</td>
+                      {CRITERIA.map((c) => (
+                        <td className="num" key={c.key}>
+                          {a.criteria ? a.criteria[c.key].toFixed(1) : "—"}
+                        </td>
+                      ))}
                       <td className="num">
                         <button
                           type="button"

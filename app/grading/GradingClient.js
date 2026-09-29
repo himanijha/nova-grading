@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { linkParts } from "@/lib/mapping";
+import InfoStar from "../InfoStar";
 
 const MAX_ROWS = 250;
 
@@ -254,7 +255,10 @@ export default function GradingClient({
             onClick={() => setParam({ id: a.id })}
           >
             <div className="app-item-top">
-              <span className="app-item-name">{a.fullName}</span>
+              <span className="app-item-name">
+                {a.fullName}
+                {a.infoSession && <InfoStar size={15} />}
+              </span>
               {a.gradedByMe ? (
                 <span className="badge mine">Graded by you</span>
               ) : (
@@ -281,7 +285,10 @@ export default function GradingClient({
           </div>
         ) : (
           <>
-            <h1>{applicant.fullName}</h1>
+            <h1>
+              {applicant.fullName}
+              {applicant.infoSession && <InfoStar size={24} />}
+            </h1>
             <div style={{ color: "var(--muted)", marginBottom: 22 }}>
               Submitted {fmtDate(applicant.submittedAt)} ·{" "}
               {ROLE_LABEL[applicant.roleCategory]}

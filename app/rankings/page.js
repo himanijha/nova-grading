@@ -2,6 +2,7 @@ import { redirect } from "next/navigation";
 import { getCurrentGrader } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import { normalizeGradYear } from "@/lib/mapping";
+import { infoSessionByApplicant } from "@/lib/infosession";
 import Nav from "../Nav";
 import RankingsClient from "./RankingsClient";
 
@@ -12,9 +13,10 @@ const avg = (nums) =>
 
 // An auto decision overrides the average outright. If two graders disagree —
 // one accept, one reject — nothing is overridden: the app has no basis for
-// picking a side, so it flags the clash and leaves the average standing.
-function overrideFor(grades) {
-  const accept = grades.some((g) => g.autoDecision === "ACCEPT");
+// picking a side, so it flags the clash and leaves the average standing. An
+// auto accept from the info session page counts the same as a grader's.
+function overrideFor(grades, info) {
+  const accept = grades.some((g) => g.autoDecision === "ACCEPT") || !!info?.autoAccept;
   const reject = grades.some((g) => g.autoDecision === "REJECT");
   if (accept && reject) return "CONFLICT";
   if (accept) return "ACCEPT";
@@ -45,33 +47,37 @@ export default async function RankingsPage() {
   const grader = await getCurrentGrader();
   if (!grader) redirect("/login");
 
-  const rows = await prisma.applicant.findMany({
-    select: {
-      id: true,
-      fullName: true,
-      gradYear: true,
-      majors: true,
-      roleCategory: true,
-      screeningStatus: true,
-      grades: {
-        select: {
-          technical: true,
-          thoughtfulness: true,
-          initiative: true,
-          communityFit: true,
-          autoDecision: true,
-          technicalNote: true,
-          thoughtfulnessNote: true,
-          initiativeNote: true,
-          communityFitNote: true,
-          overallNote: true,
-          grader: { select: { name: true } },
+  const [rows, infoSession] = await Promise.all([
+    prisma.applicant.findMany({
+      select: {
+        id: true,
+        fullName: true,
+        gradYear: true,
+        majors: true,
+        roleCategory: true,
+        screeningStatus: true,
+        grades: {
+          select: {
+            technical: true,
+            thoughtfulness: true,
+            initiative: true,
+            communityFit: true,
+            autoDecision: true,
+            technicalNote: true,
+            thoughtfulnessNote: true,
+            initiativeNote: true,
+            communityFitNote: true,
+            overallNote: true,
+            grader: { select: { name: true } },
+          },
         },
       },
-    },
-  });
+    }),
+    infoSessionByApplicant(),
+  ]);
 
   const applicants = rows.map((a) => {
+    const info = infoSession.get(a.id);
     const totals = a.grades.map(
       (g) => g.technical + g.thoughtfulness + g.initiative + g.communityFit
     );
@@ -101,15 +107,23 @@ export default async function RankingsPage() {
           notes: notesFrom(g),
         }))
         .sort((x, y) => y.total - x.total || x.graderName.localeCompare(y.graderName)),
-      override: overrideFor(a.grades),
-      noteCount: a.grades.reduce((n, g) => n + notesFrom(g).length, 0),
+      infoSession: info
+        ? { note: info.note, autoAccept: info.autoAccept, byName: info.updatedByName }
+        : null,
+      override: overrideFor(a.grades, info),
+      noteCount:
+        a.grades.reduce((n, g) => n + notesFrom(g).length, 0) + (info?.note ? 1 : 0),
       average: totals.length ? Number(avg(totals).toFixed(2)) : null,
-      criteria: {
-        technical: Number(avg(a.grades.map((g) => g.technical)).toFixed(2)),
-        thoughtfulness: Number(avg(a.grades.map((g) => g.thoughtfulness)).toFixed(2)),
-        initiative: Number(avg(a.grades.map((g) => g.initiative)).toFixed(2)),
-        communityFit: Number(avg(a.grades.map((g) => g.communityFit)).toFixed(2)),
-      },
+      // Null with no reviews: an info session auto accept can rank someone
+      // nobody has graded yet, and 0.0 would read as a score.
+      criteria: totals.length
+        ? {
+            technical: Number(avg(a.grades.map((g) => g.technical)).toFixed(2)),
+            thoughtfulness: Number(avg(a.grades.map((g) => g.thoughtfulness)).toFixed(2)),
+            initiative: Number(avg(a.grades.map((g) => g.initiative)).toFixed(2)),
+            communityFit: Number(avg(a.grades.map((g) => g.communityFit)).toFixed(2)),
+          }
+        : null,
     };
   });
 
