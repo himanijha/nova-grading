@@ -63,6 +63,7 @@ export default async function RankingsPage() {
             initiative: true,
             communityFit: true,
             autoDecision: true,
+            nextRound: true,
             technicalNote: true,
             thoughtfulnessNote: true,
             initiativeNote: true,
@@ -104,6 +105,7 @@ export default async function RankingsPage() {
           },
           total: g.technical + g.thoughtfulness + g.initiative + g.communityFit,
           autoDecision: g.autoDecision,
+          nextRound: g.nextRound,
           notes: notesFrom(g),
         }))
         .sort((x, y) => y.total - x.total || x.graderName.localeCompare(y.graderName)),
@@ -111,6 +113,12 @@ export default async function RankingsPage() {
         ? { note: info.note, autoAccept: info.autoAccept, byName: info.updatedByName }
         : null,
       override: overrideFor(a.grades, info),
+      // The graders' final thumbs up/down. Shown only — deliberately left out
+      // of the average, the override and the sort below.
+      thumbs: {
+        up: a.grades.filter((g) => g.nextRound === "PASS").length,
+        down: a.grades.filter((g) => g.nextRound === "FAIL").length,
+      },
       noteCount:
         a.grades.reduce((n, g) => n + notesFrom(g).length, 0) + (info?.note ? 1 : 0),
       average: totals.length ? Number(avg(totals).toFixed(2)) : null,

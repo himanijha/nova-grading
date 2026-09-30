@@ -143,6 +143,7 @@ export default async function GradingPage({ searchParams }) {
           communityFitNote: g.communityFitNote,
           overallNote: g.overallNote,
           autoDecision: g.autoDecision,
+          nextRound: g.nextRound,
           updatedAt: g.updatedAt.toISOString(),
         })),
       };

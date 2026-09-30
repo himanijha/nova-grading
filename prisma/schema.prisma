@@ -156,6 +156,11 @@ model Grade {
   // explain it in overallNote, and the reason is readable from Rankings.
   autoDecision       String?  // ACCEPT | REJECT
 
+  // The grader's gut call on whether this person goes to the next round.
+  // Shown as a thumbs tally in Rankings but never feeds the average or the
+  // order. Null on grades saved before it existed.
+  nextRound          String?  // PASS | FAIL
+
   createdAt      DateTime @default(now())
   updatedAt      DateTime @updatedAt
 

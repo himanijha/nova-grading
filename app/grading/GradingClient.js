@@ -406,6 +406,7 @@ function ScoringPanel({ grader, applicant, myGrade, list, onNavigate }) {
   const [msg, setMsg] = useState("");
   const [busy, setBusy] = useState(false);
   const [autoDecision, setAutoDecision] = useState(myGrade?.autoDecision || null);
+  const [nextRound, setNextRound] = useState(myGrade?.nextRound || null);
   const msgTimer = useRef(null);
 
   useEffect(() => () => clearTimeout(msgTimer.current), []);
@@ -431,6 +432,9 @@ function ScoringPanel({ grader, applicant, myGrade, list, onNavigate }) {
       return;
     }
     setAutoDecision(decision);
+    // An auto accept is a thumbs up and an auto reject a thumbs down; either
+    // can still be flipped by hand afterwards.
+    setNextRound(decision === "ACCEPT" ? "PASS" : "FAIL");
     const n = decision === "ACCEPT" ? 5 : 1;
     setScores({ technical: n, thoughtfulness: n, initiative: n, communityFit: n });
   }
@@ -443,6 +447,7 @@ function ScoringPanel({ grader, applicant, myGrade, list, onNavigate }) {
 
   async function save(advance) {
     if (!complete) return flash("Score all four criteria before saving.");
+    if (!nextRound) return flash("Give a final thumbs up or thumbs down.");
     if (autoDecision && !notes.overallNote.trim()) {
       return flash(
         `Explain this auto ${autoDecision === "ACCEPT" ? "accept" : "reject"} in the notes.`
@@ -452,7 +457,7 @@ function ScoringPanel({ grader, applicant, myGrade, list, onNavigate }) {
     const res = await fetch("/api/grades", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ applicantId: applicant.id, ...scores, ...notes, autoDecision }),
+      body: JSON.stringify({ applicantId: applicant.id, ...scores, ...notes, autoDecision, nextRound }),
     });
     setBusy(false);
 
@@ -556,6 +561,34 @@ function ScoringPanel({ grader, applicant, myGrade, list, onNavigate }) {
         </div>
       </div>
 
+      <div className="criterion next-round-block">
+        <div className="criterion-name">
+          Next round<span className="req"> — required</span>
+        </div>
+        <div className="criterion-desc">
+          Your final call: should they pass to the next round? Shown as a tally
+          in Rankings; it does not change the score or the ranking.
+        </div>
+        <div className="auto-row">
+          <button
+            type="button"
+            className={`btn auto accept${nextRound === "PASS" ? " on" : ""}`}
+            aria-pressed={nextRound === "PASS"}
+            onClick={() => setNextRound("PASS")}
+          >
+            👍 Pass
+          </button>
+          <button
+            type="button"
+            className={`btn auto reject${nextRound === "FAIL" ? " on" : ""}`}
+            aria-pressed={nextRound === "FAIL"}
+            onClick={() => setNextRound("FAIL")}
+          >
+            👎 Don&apos;t pass
+          </button>
+        </div>
+      </div>
+
       <div style={{ fontSize: 13, color: "var(--muted)" }}>
         Your total: <strong>{total}</strong> / 20
       </div>
@@ -590,6 +623,11 @@ function ScoringPanel({ grader, applicant, myGrade, list, onNavigate }) {
               {g.graderId === grader.id ? " (you)" : ""}
             </span>
             <span className="grader-scores">
+              {g.nextRound && (
+                <span title={g.nextRound === "PASS" ? "Pass" : "Don't pass"}>
+                  {g.nextRound === "PASS" ? "👍" : "👎"}{" "}
+                </span>
+              )}
               {g.autoDecision && (
                 <span className={`dtag ${g.autoDecision.toLowerCase()}`}>
                   {g.autoDecision === "ACCEPT" ? "auto accept" : "auto reject"}

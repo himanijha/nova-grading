@@ -93,6 +93,12 @@ function Reviews({ applicant }) {
               </span>
             )}
             {g.graderName} · {g.total}/{MAX_SCORE}
+            {g.nextRound && (
+              <span title={g.nextRound === "PASS" ? "Pass" : "Don't pass"}>
+                {" "}
+                · {g.nextRound === "PASS" ? "👍" : "👎"}
+              </span>
+            )}
           </div>
           <div className="review-scores">
             {CRITERIA.map((c) => (
@@ -501,6 +507,9 @@ export default function RankingsClient({ applicants, isAdmin }) {
                 <th className="num">Thought</th>
                 <th className="num">Init</th>
                 <th className="num">Comm</th>
+                <th className="num" title="Final thumbs up / down from each grader. Does not affect the ranking.">
+                  👍 / 👎
+                </th>
                 <th className="num">Reviews</th>
                 <th className="num">Notes</th>
                 <th>Result</th>
@@ -512,7 +521,7 @@ export default function RankingsClient({ applicants, isAdmin }) {
                 // In a single-year view the list is one clean cut, so mark the line.
                 const showCut =
                   singleYear && !ok && (i === 0 || isAbove(graded[i - 1]));
-                const cols = singleYear ? 12 : 13;
+                const cols = singleYear ? 13 : 14;
                 return (
                   <Fragment key={a.id}>
                     {showCut && (
@@ -562,6 +571,19 @@ export default function RankingsClient({ applicants, isAdmin }) {
                           {a.criteria ? a.criteria[c.key].toFixed(1) : "—"}
                         </td>
                       ))}
+                      <td
+                        className="num thumbs-cell"
+                        title={`${a.thumbs.up} pass · ${a.thumbs.down} don't pass`}
+                      >
+                        {a.thumbs.up + a.thumbs.down === 0 ? (
+                          "—"
+                        ) : (
+                          <>
+                            <span className="thumb up">👍 {a.thumbs.up}</span>
+                            <span className="thumb down">👎 {a.thumbs.down}</span>
+                          </>
+                        )}
+                      </td>
                       <td className="num">
                         <button
                           type="button"

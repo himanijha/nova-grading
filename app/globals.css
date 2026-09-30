@@ -485,7 +485,8 @@ input[type="range"] {
 /* Auto accept / auto reject ------------------------------------------------
    An override of the rubric, so it reads as a decision rather than a score.
    Deliberately quiet: these are rare, and the table still ranks by number. */
-.auto-block { border-top: 1px solid var(--line); padding-top: 12px; }
+.auto-block,
+.next-round-block { border-top: 1px solid var(--line); padding-top: 12px; }
 .auto-row { display: flex; gap: 8px; flex-wrap: wrap; }
 .btn.auto { flex: 1 1 0; min-width: 120px; justify-content: center; }
 .btn.auto.accept.on {
@@ -521,6 +522,13 @@ textarea.inp.needed { border-color: var(--danger); }
 .dtag.clickable:hover { border-color: currentColor; }
 
 .note-row td { background: var(--bg); font-size: 13px; }
+
+/* Next-round thumbs tally in Rankings. Display only; never part of the rank. */
+.thumbs-cell { white-space: nowrap; }
+.thumb { display: inline-block; font-variant-numeric: tabular-nums; }
+.thumb + .thumb { margin-left: 8px; }
+.thumb.up { color: var(--good); }
+.thumb.down { color: var(--danger); }
 .note-line {
   display: flex;
   gap: 8px;
