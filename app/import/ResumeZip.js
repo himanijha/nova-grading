@@ -4,7 +4,9 @@ import { useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { unzip } from "fflate";
 import { RESUME_TYPES, matchResume } from "@/lib/resumes";
-import { MAX_UPLOAD_BYTES, MAX_UPLOAD_LABEL } from "@/lib/upload";
+import { MAX_RESUME_LABEL } from "@/lib/upload";
+import { resumeProblem, uploadResume } from "@/lib/resume-client";
+import MissingResumes from "./MissingResumes";
 
 const unzipAsync = (bytes) =>
   new Promise((resolve, reject) => unzip(bytes, (e, out) => (e ? reject(e) : resolve(out))));
@@ -48,10 +50,7 @@ export default function ResumeZip({ applicants }) {
       .map(([path, bytes]) => {
         const name = path.split("/").pop();
         const type = RESUME_TYPES[name.split(".").pop().toLowerCase()];
-        let problem = null;
-        if (!type) problem = "not a PDF, Word doc or image";
-        else if (bytes.length > MAX_UPLOAD_BYTES)
-          problem = `${(bytes.length / 1024 / 1024).toFixed(1)}MB, over the ${MAX_UPLOAD_LABEL} limit`;
+        const problem = resumeProblem(name, bytes.length);
         return {
           name,
           bytes,
@@ -90,18 +89,15 @@ export default function ResumeZip({ applicants }) {
     for (let i = 0; i < files.length; i++) {
       const f = files[i];
       if (!willUpload(f)) continue;
-      setRow(i, { status: "Uploading…" });
-      const body = new FormData();
-      body.append("applicantId", f.applicantId);
-      body.append("file", new File([f.bytes], f.name, { type: f.type }));
-      const res = await fetch("/api/resume", { method: "POST", body });
-      const data = await res.json().catch(() => ({}));
-      if (res.ok) {
+      const r = await uploadResume(f.applicantId, new File([f.bytes], f.name, { type: f.type }), (status) =>
+        setRow(i, { status })
+      );
+      if (r.ok) {
         ok++;
         setRow(i, { status: "Saved" });
       } else {
         failed++;
-        setRow(i, { status: data.error || "Upload failed." });
+        setRow(i, { status: r.error });
       }
     }
     setBusy(false);
@@ -127,6 +123,11 @@ export default function ResumeZip({ applicants }) {
         have a resume so far. Applicants who already have one are skipped unless
         you tick replace.
       </p>
+
+      <MissingResumes
+        applicants={applicants}
+        pending={(files || []).filter((f) => f.applicantId && !f.problem && f.status !== "Saved")}
+      />
 
       <div
         className={`dropzone${over ? " over" : ""}${busy ? " busy" : ""}`}
@@ -158,7 +159,7 @@ export default function ResumeZip({ applicants }) {
           }}
         />
         <span className="drop-big">Drag the resumes zip here</span>
-        <span className="drop-small">or click to choose it · each resume max {MAX_UPLOAD_LABEL}</span>
+        <span className="drop-small">or click to choose it · each resume max {MAX_RESUME_LABEL}</span>
       </div>
 
       {msg && <div className="save-note">{msg}</div>}

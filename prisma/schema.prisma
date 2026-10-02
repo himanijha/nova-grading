@@ -114,6 +114,19 @@ model ApplicantResume {
   updatedAt    DateTime @updatedAt
 }
 
+// Pieces of a resume too big for one request (the platform caps bodies at
+// 4.5MB). They wait here until the last one arrives, then are joined into the
+// ApplicantResume and deleted.
+model ResumeUploadPart {
+  uploadId    String
+  index       Int
+  applicantId String
+  data        Bytes
+  createdAt   DateTime @default(now())
+
+  @@id([uploadId, index])
+}
+
 // Interview selection runs on these, not on the rubric scores. One per grader
 // per applicant, like a grade, so the ranking can aggregate across the team.
 model Rating {
