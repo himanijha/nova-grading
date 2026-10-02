@@ -74,7 +74,7 @@ function Essay({ q, a }) {
  */
 function Coverage({ coverage }) {
   const [open, setOpen] = useState(false);
-  const { total, targets, exact, threePlus } = coverage;
+  const { total, targets, exact, fivePlus } = coverage;
 
   // The one number worth reading without opening anything: how much of the pile
   // has not been touched at all.
@@ -131,7 +131,7 @@ function Coverage({ coverage }) {
               </span>
             ))}
             <span>
-              <strong>{threePlus}</strong> with 3 or more
+              <strong>{fivePlus}</strong> with 5 or more
             </span>
           </div>
         </div>

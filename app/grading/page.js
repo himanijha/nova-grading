@@ -163,14 +163,14 @@ export default async function GradingPage({ searchParams }) {
   const coverage = {
     total: counts.length,
     // For each target: how many have reached it, and how many have not.
-    targets: [1, 2, 3].map((n) => ({
+    targets: [1, 2, 3, 4, 5].map((n) => ({
       n,
       have: counts.filter((c) => c >= n).length,
       left: counts.filter((c) => c < n).length,
     })),
-    // The exact spread, so "3" does not hide someone sitting on six reviews.
-    exact: [0, 1, 2].map((n) => ({ n, count: counts.filter((c) => c === n).length })),
-    threePlus: counts.filter((c) => c >= 3).length,
+    // The exact spread, so "5" does not hide someone sitting on eight reviews.
+    exact: [0, 1, 2, 3, 4].map((n) => ({ n, count: counts.filter((c) => c === n).length })),
+    fivePlus: counts.filter((c) => c >= 5).length,
   };
 
   return (
