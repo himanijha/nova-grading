@@ -234,8 +234,11 @@ function SaveResult({ shown, isAbove, counts, onSaved }) {
   );
 }
 
-/** One applicant's saved result; admins can change it in place. */
-function StatusCell({ applicant, isAdmin, onSaved }) {
+/**
+ * One applicant's saved result; admins can change it in place. `beforePass`
+ * runs first when someone is marked passed, to lift them above the cut line.
+ */
+function StatusCell({ applicant, isAdmin, onSaved, beforePass }) {
   const [busy, setBusy] = useState(false);
   const status = applicant.screeningStatus;
   if (!isAdmin) {
@@ -249,6 +252,7 @@ function StatusCell({ applicant, isAdmin, onSaved }) {
       aria-label={`Screening result for ${applicant.fullName}`}
       onChange={async (e) => {
         setBusy(true);
+        if (e.target.value === "PASSED") await beforePass?.();
         await fetch("/api/screening", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -366,21 +370,30 @@ export default function RankingsClient({ applicants: saved, isAdmin }) {
     setOrderMsg("Could not save the new order.");
   }
 
-  // The draggable rows in order, with the cut line among them in a one-year
-  // view so a drop either side of it decides pass or fail.
-  function movableSeq() {
+  // The draggable rows in order, with the cut line for `year` among them so a
+  // drop either side of it decides pass or fail. Without a year, no cut line.
+  function seqOf(rows, year) {
     const seq = [];
-    for (const a of graded) {
+    const cut = () => {
+      if (year && !seq.some((x) => x.id === CUT)) seq.push({ id: CUT, value: cutoffFor(year), fixed: true });
+    };
+    for (const a of rows) {
       if (overrideRank(a) !== 1) continue;
-      if (singleYear && !seq.some((x) => x.id === CUT) && !isAbove(a)) {
-        seq.push({ id: CUT, value: cutoffFor(yearFilter), fixed: true });
-      }
+      if (!isAbove(a)) cut();
       seq.push({ id: a.id, value: effective(a) });
     }
-    if (singleYear && !seq.some((x) => x.id === CUT)) {
-      seq.push({ id: CUT, value: cutoffFor(yearFilter), fixed: true });
-    }
+    cut();
     return seq;
+  }
+  const movableSeq = () => seqOf(graded, singleYear ? yearFilter : null);
+
+  // Passing someone who sits below the cutoff lifts them to just above the cut
+  // line for their year, so the passes stay together and the totals count them.
+  function liftAboveCut(a) {
+    if (overrideRank(a) !== 1 || isAbove(a)) return;
+    const sameYear = applicants.filter((b) => b.gradYear === a.gradYear && effective(b) !== null);
+    const items = seqOf(sameYear, a.gradYear).filter((x) => x.id !== a.id);
+    return saveOrder(placeAt(items, a.id, items.findIndex((x) => x.id === CUT)));
   }
 
   // Move `id` to just before or after the row `key` (an applicant or the cut line).
@@ -797,6 +810,7 @@ export default function RankingsClient({ applicants: saved, isAdmin }) {
                           applicant={a}
                           isAdmin={isAdmin}
                           onSaved={() => router.refresh()}
+                          beforePass={() => liftAboveCut(a)}
                         />
                       </td>
                     </tr>
