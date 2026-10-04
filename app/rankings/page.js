@@ -3,6 +3,7 @@ import { getCurrentGrader } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import { normalizeGradYear } from "@/lib/mapping";
 import { infoSessionByApplicant } from "@/lib/infosession";
+import { effective } from "@/lib/rank-order";
 import Nav from "../Nav";
 import RankingsClient from "./RankingsClient";
 
@@ -56,6 +57,7 @@ export default async function RankingsPage() {
         majors: true,
         roleCategory: true,
         screeningStatus: true,
+        rankScore: true,
         grades: {
           select: {
             technical: true,
@@ -122,6 +124,7 @@ export default async function RankingsPage() {
       noteCount:
         a.grades.reduce((n, g) => n + notesFrom(g).length, 0) + (info?.note ? 1 : 0),
       average: totals.length ? Number(avg(totals).toFixed(2)) : null,
+      rankScore: a.rankScore,
       // Null with no reviews: an info session auto accept can rank someone
       // nobody has graded yet, and 0.0 would read as a score.
       criteria: totals.length
@@ -135,12 +138,12 @@ export default async function RankingsPage() {
     };
   });
 
-  // Overrides first, then highest average; ties broken by more reviews (more
-  // confidence), then name.
+  // Overrides first, then highest average (or wherever someone was dragged to);
+  // ties broken by more reviews (more confidence), then name.
   applicants.sort(
     (a, b) =>
       overrideRank(a) - overrideRank(b) ||
-      (b.average ?? -1) - (a.average ?? -1) ||
+      (effective(b) ?? -1) - (effective(a) ?? -1) ||
       b.reviewCount - a.reviewCount ||
       a.fullName.localeCompare(b.fullName)
   );

@@ -68,6 +68,11 @@ model Applicant {
   // can be put in a cohort for the group work event.
   screeningStatus String @default("PENDING") // PENDING | PASSED | REJECTED
 
+  // Set by dragging the applicant in Rankings: a stand-in for their average
+  // that sorts them where they were dropped and is judged against the cutoff.
+  // Null means they sit wherever their average puts them.
+  rankScore       Float?
+
   grades        Grade[]
   photo         ApplicantPhoto?
   resume        ApplicantResume?

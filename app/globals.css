@@ -414,6 +414,31 @@ input[type="range"] {
 .rank-table .rank-name { font-weight: 600; }
 .rank-table .rank-name a { text-decoration: none; }
 .rank-table .rank-name a:hover { text-decoration: underline; }
+.rank-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+.rank-table .drag-cell { width: 28px; padding-right: 0; }
+.drag-handle {
+  border: 0;
+  background: none;
+  padding: 2px 4px;
+  border-radius: 6px;
+  color: var(--muted);
+  font: inherit;
+  letter-spacing: -0.2em;
+  cursor: grab;
+}
+.drag-handle:hover, .drag-handle:focus-visible { background: var(--accent-soft); color: var(--accent); }
+.drag-handle:active { cursor: grabbing; }
+.drag-none { color: var(--line); padding: 0 6px; }
+.rank-table tr.dragging { opacity: 0.4; }
+.rank-table tr.drop-before td { box-shadow: inset 0 2px 0 var(--accent); }
+.rank-table tr.drop-after td { box-shadow: inset 0 -2px 0 var(--accent); }
+.dtag.moved { background: var(--accent-soft); color: var(--accent); }
 .cut-line td {
   padding: 6px 8px;
   background: var(--accent-soft);

@@ -1,10 +1,11 @@
 "use client";
 
-import { Fragment, useMemo, useState } from "react";
+import { Fragment, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { compareGradYears, gradYearParts, GRAD_YEAR_OPTIONS } from "@/lib/mapping";
 import InfoStar from "../InfoStar";
+import { effective, placeAt } from "@/lib/rank-order";
 
 const ROLE_LABEL = {
   DEVELOPER: "Developer",
@@ -19,6 +20,12 @@ const STATUS_LABEL = { PASSED: "Passed", REJECTED: "Not passed", PENDING: "Undec
 
 const MAX_SCORE = 20;
 const DEFAULT_CUTOFF = 14;
+
+// Accepts on top, rejects at the bottom, everyone else ranked by score. Only
+// the middle can be dragged: an auto decision already settles where someone sits.
+const overrideRank = (a) =>
+  a.override === "ACCEPT" ? 0 : a.override === "REJECT" ? 2 : 1;
+const CUT = "cut";
 
 /** Counts by key, rendered as a single-hue magnitude bar list. */
 function Breakdown({ title, rows, total }) {
@@ -260,8 +267,29 @@ function StatusCell({ applicant, isAdmin, onSaved }) {
   );
 }
 
-export default function RankingsClient({ applicants, isAdmin }) {
+export default function RankingsClient({ applicants: saved, isAdmin }) {
   const router = useRouter();
+
+  // Drags show at once and save behind; fresh data from the server replaces them.
+  const [placed, setPlaced] = useState({});
+  useEffect(() => setPlaced({}), [saved]);
+  const [orderMsg, setOrderMsg] = useState("");
+  const [dragging, setDragging] = useState(null);
+  const [dropAt, setDropAt] = useState(null); // { key, after }
+
+  const applicants = useMemo(
+    () =>
+      saved
+        .map((a) => (a.id in placed ? { ...a, rankScore: placed[a.id] } : a))
+        .sort(
+          (a, b) =>
+            overrideRank(a) - overrideRank(b) ||
+            (effective(b) ?? -1) - (effective(a) ?? -1) ||
+            b.reviewCount - a.reviewCount ||
+            a.fullName.localeCompare(b.fullName)
+        ),
+    [saved, placed]
+  );
   const [openNotes, setOpenNotes] = useState(null);
   const [minReviews, setMinReviews] = useState(1);
   const [roleFilter, setRoleFilter] = useState("all");
@@ -317,8 +345,88 @@ export default function RankingsClient({ applicants, isAdmin }) {
   const isAbove = (a) => {
     if (a.override === "ACCEPT") return true;
     if (a.override === "REJECT") return false;
-    return a.average >= cutoffFor(a.gradYear);
+    // Someone dragged into place is judged by where they were put.
+    return effective(a) >= cutoffFor(a.gradYear);
   };
+
+  async function saveOrder(updates) {
+    if (updates.length === 0) return;
+    const before = placed;
+    setPlaced((p) => ({ ...p, ...Object.fromEntries(updates.map((u) => [u.id, u.rankScore])) }));
+    setOrderMsg("");
+    const res = await fetch("/api/rank-order", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        updates: updates.map((u) => ({ applicantId: u.id, rankScore: u.rankScore })),
+      }),
+    }).catch(() => null);
+    if (res?.ok) return router.refresh();
+    setPlaced(before);
+    setOrderMsg("Could not save the new order.");
+  }
+
+  // The draggable rows in order, with the cut line among them in a one-year
+  // view so a drop either side of it decides pass or fail.
+  function movableSeq() {
+    const seq = [];
+    for (const a of graded) {
+      if (overrideRank(a) !== 1) continue;
+      if (singleYear && !seq.some((x) => x.id === CUT) && !isAbove(a)) {
+        seq.push({ id: CUT, value: cutoffFor(yearFilter), fixed: true });
+      }
+      seq.push({ id: a.id, value: effective(a) });
+    }
+    if (singleYear && !seq.some((x) => x.id === CUT)) {
+      seq.push({ id: CUT, value: cutoffFor(yearFilter), fixed: true });
+    }
+    return seq;
+  }
+
+  // Move `id` to just before or after the row `key` (an applicant or the cut line).
+  function moveNextTo(id, key, after) {
+    if (id === key) return;
+    const items = movableSeq().filter((x) => x.id !== id);
+    const target = graded.find((a) => a.id === key);
+    let index;
+    if (target && overrideRank(target) === 0) index = 0;
+    else if (target && overrideRank(target) === 2) index = items.length;
+    else {
+      const at = items.findIndex((x) => x.id === key);
+      if (at === -1) return;
+      index = at + (after ? 1 : 0);
+    }
+    saveOrder(placeAt(items, id, index));
+  }
+
+  // Arrow keys on the handle: one step up or down, the cut line counting as a step.
+  function nudge(id, dir) {
+    const seq = movableSeq();
+    const at = seq.findIndex((x) => x.id === id);
+    const index = at + dir;
+    if (at === -1 || index < 0 || index >= seq.length) return;
+    saveOrder(placeAt(seq.filter((x) => x.id !== id), id, index));
+  }
+
+  const dropProps = (key) => ({
+    onDragOver: (e) => {
+      if (!dragging) return;
+      e.preventDefault();
+      const r = e.currentTarget.getBoundingClientRect();
+      const after = e.clientY > r.top + r.height / 2;
+      if (dropAt?.key !== key || dropAt.after !== after) setDropAt({ key, after });
+    },
+    onDrop: (e) => {
+      e.preventDefault();
+      if (dragging && dropAt) moveNextTo(dragging, dropAt.key, dropAt.after);
+      setDragging(null);
+      setDropAt(null);
+    },
+  });
+  const dropClass = (key) =>
+    dropAt?.key === key ? (dropAt.after ? " drop-after" : " drop-before") : "";
+
+  const movedCount = saved.filter((a) => a.rankScore !== null).length;
   const above = graded.filter(isAbove);
 
   const visibleYears = yearFilter === "all" ? allYears : [yearFilter];
@@ -354,7 +462,9 @@ export default function RankingsClient({ applicants, isAdmin }) {
       <p className="sub">
         Applicants ranked by their average grader score out of {MAX_SCORE}. Each
         graduation year has its own cutoff, so you can admit a different number
-        from each class.
+        from each class. Drag anyone by the ⋮⋮ handle to move them up or down;
+        where they land decides whether they clear the cutoff, and everyone sees
+        the new order.
       </p>
 
       <div className="toolbar">
@@ -487,16 +597,38 @@ export default function RankingsClient({ applicants, isAdmin }) {
       </section>
 
       <section className="card">
-        <h3>
-          Ranked applicants ({graded.length})
-          {singleYear ? ` — class of ${yearFilter}` : ""}
-        </h3>
+        <div className="rank-head">
+          <h3>
+            Ranked applicants ({graded.length})
+            {singleYear ? ` — class of ${yearFilter}` : ""}
+          </h3>
+          {movedCount > 0 && (
+            <button
+              className="btn sm"
+              onClick={() => {
+                if (
+                  window.confirm(
+                    `Put all ${movedCount} moved ${movedCount === 1 ? "applicant" : "applicants"} back where their average ranks them? This is for everyone.`
+                  )
+                ) {
+                  saveOrder(
+                    saved.filter((a) => a.rankScore !== null).map((a) => ({ id: a.id, rankScore: null }))
+                  );
+                }
+              }}
+            >
+              Reset order ({movedCount} moved)
+            </button>
+          )}
+        </div>
+        {orderMsg && <div className="err">{orderMsg}</div>}
         {graded.length === 0 ? (
           <div className="empty">No graded applicants match these filters yet.</div>
         ) : (
           <table className="tbl rank-table">
             <thead>
               <tr>
+                <th aria-label="Move" />
                 <th className="num">#</th>
                 <th>Name</th>
                 <th>Role</th>
@@ -521,17 +653,56 @@ export default function RankingsClient({ applicants, isAdmin }) {
                 // In a single-year view the list is one clean cut, so mark the line.
                 const showCut =
                   singleYear && !ok && (i === 0 || isAbove(graded[i - 1]));
-                const cols = singleYear ? 13 : 14;
+                const cols = singleYear ? 14 : 15;
+                const movable = overrideRank(a) === 1;
                 return (
                   <Fragment key={a.id}>
                     {showCut && (
-                      <tr className="cut-line">
+                      <tr className={`cut-line${dropClass(CUT)}`} {...dropProps(CUT)}>
                         <td colSpan={cols}>
                           Cutoff — {cutoffFor(yearFilter).toFixed(2)}
                         </td>
                       </tr>
                     )}
-                    <tr className={ok ? "above" : "below"}>
+                    <tr
+                      id={`rank-${a.id}`}
+                      className={`${ok ? "above" : "below"}${dragging === a.id ? " dragging" : ""}${dropClass(a.id)}`}
+                      {...dropProps(a.id)}
+                    >
+                      <td className="drag-cell">
+                        {movable ? (
+                          <button
+                            type="button"
+                            className="drag-handle"
+                            draggable
+                            title="Drag to move, or use the arrow keys"
+                            aria-label={`Move ${a.fullName}`}
+                            onDragStart={(e) => {
+                              e.dataTransfer.effectAllowed = "move";
+                              e.dataTransfer.setData("text/plain", a.id);
+                              const tr = document.getElementById(`rank-${a.id}`);
+                              if (tr) e.dataTransfer.setDragImage(tr, 16, 16);
+                              setDragging(a.id);
+                            }}
+                            onDragEnd={() => {
+                              setDragging(null);
+                              setDropAt(null);
+                            }}
+                            onKeyDown={(e) => {
+                              if (e.key === "ArrowUp" || e.key === "ArrowDown") {
+                                e.preventDefault();
+                                nudge(a.id, e.key === "ArrowUp" ? -1 : 1);
+                              }
+                            }}
+                          >
+                            ⋮⋮
+                          </button>
+                        ) : (
+                          <span className="drag-none" title="An auto decision sets where they sit">
+                            ·
+                          </span>
+                        )}
+                      </td>
                       <td className="num">{i + 1}</td>
                       <td className="rank-name">
                         <Link href={`/grading?id=${a.id}`}>{a.fullName}</Link>
@@ -551,6 +722,16 @@ export default function RankingsClient({ applicants, isAdmin }) {
                               : a.override === "REJECT"
                               ? "auto reject"
                               : "conflict"}
+                          </button>
+                        )}
+                        {a.rankScore !== null && movable && (
+                          <button
+                            type="button"
+                            className="dtag moved clickable"
+                            title={`Placed at ${a.rankScore.toFixed(2)}. Click to put them back at their average.`}
+                            onClick={() => saveOrder([{ id: a.id, rankScore: null }])}
+                          >
+                            moved ✕
                           </button>
                         )}
                       </td>
