@@ -132,6 +132,14 @@ model ResumeUploadPart {
   @@id([uploadId, index])
 }
 
+// The Rankings cutoff for one graduation year. Shared, so everyone looking at
+// Rankings sees the same line; a year with no row sits at the default.
+model RankingCutoff {
+  gradYear  String   @id
+  cutoff    Float
+  updatedAt DateTime @updatedAt
+}
+
 // Interview selection runs on these, not on the rubric scores. One per grader
 // per applicant, like a grade, so the ranking can aggregate across the team.
 model Rating {

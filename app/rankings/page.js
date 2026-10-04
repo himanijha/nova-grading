@@ -48,7 +48,7 @@ export default async function RankingsPage() {
   const grader = await getCurrentGrader();
   if (!grader) redirect("/login");
 
-  const [rows, infoSession] = await Promise.all([
+  const [rows, infoSession, cutoffRows] = await Promise.all([
     prisma.applicant.findMany({
       select: {
         id: true,
@@ -77,6 +77,7 @@ export default async function RankingsPage() {
       },
     }),
     infoSessionByApplicant(),
+    prisma.rankingCutoff.findMany({ select: { gradYear: true, cutoff: true } }),
   ]);
 
   const applicants = rows.map((a) => {
@@ -151,7 +152,11 @@ export default async function RankingsPage() {
   return (
     <>
       <Nav grader={grader} />
-      <RankingsClient applicants={applicants} isAdmin={grader.isAdmin} />
+      <RankingsClient
+        applicants={applicants}
+        savedCutoffs={Object.fromEntries(cutoffRows.map((c) => [c.gradYear, c.cutoff]))}
+        isAdmin={grader.isAdmin}
+      />
     </>
   );
 }

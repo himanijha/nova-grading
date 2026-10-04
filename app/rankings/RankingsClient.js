@@ -1,6 +1,6 @@
 "use client";
 
-import { Fragment, useEffect, useMemo, useState } from "react";
+import { Fragment, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { compareGradYears, gradYearParts, GRAD_YEAR_OPTIONS } from "@/lib/mapping";
@@ -190,7 +190,11 @@ function SaveResult({ shown, isAbove, counts, onSaved }) {
     const data = await res.json().catch(() => ({}));
     setBusy(false);
     setAsking(false);
-    setMsg(res.ok ? `Saved ${data.saved} results.` : data.error || "Could not save.");
+    setMsg(
+      res.ok
+        ? `Saved ${data.saved} results. Everyone passed is now on the Cohorts page.`
+        : data.error || "Could not save."
+    );
     if (res.ok) onSaved();
   }
 
@@ -200,6 +204,12 @@ function SaveResult({ shown, isAbove, counts, onSaved }) {
       <div className="save-result-counts">
         Saved so far: <strong>{counts.PASSED}</strong> passed ·{" "}
         <strong>{counts.REJECTED}</strong> not passed · <strong>{counts.PENDING}</strong> undecided
+        {counts.PASSED > 0 && (
+          <>
+            {" "}
+            · <Link href="/cohorts">Put the {counts.PASSED} passed into cohorts →</Link>
+          </>
+        )}
       </div>
       {!asking ? (
         <button
@@ -271,7 +281,7 @@ function StatusCell({ applicant, isAdmin, onSaved, beforePass }) {
   );
 }
 
-export default function RankingsClient({ applicants: saved, isAdmin }) {
+export default function RankingsClient({ applicants: saved, savedCutoffs, isAdmin }) {
   const router = useRouter();
 
   // Drags show at once and save behind; fresh data from the server replaces them.
@@ -314,12 +324,41 @@ export default function RankingsClient({ applicants: saved, isAdmin }) {
     return [...set].sort(compareGradYears);
   }, [allYears]);
 
-  // Each year carries its own cutoff, so you can admit a different number per class.
-  const [cutoffs, setCutoffs] = useState(() =>
-    Object.fromEntries(allYears.map((y) => [y, DEFAULT_CUTOFF]))
-  );
+  // Each year carries its own cutoff, so you can admit a different number per
+  // class. They are shared: a slider move saves once it settles, and the next
+  // load shows it to everyone.
+  const [cutoffs, setCutoffs] = useState(savedCutoffs);
+  const unsaved = useRef({});
+  const saveTimer = useRef(null);
+  const [cutoffMsg, setCutoffMsg] = useState("");
+  useEffect(() => {
+    // Fresh data from the server, but never over a move still waiting to save.
+    setCutoffs((c) => ({ ...c, ...savedCutoffs, ...unsaved.current }));
+  }, [savedCutoffs]);
+
   const cutoffFor = (year) => cutoffs[year] ?? DEFAULT_CUTOFF;
-  const setCutoff = (year, value) => setCutoffs((c) => ({ ...c, [year]: value }));
+  function setCutoffsAndSave(changes) {
+    setCutoffs((c) => ({ ...c, ...changes }));
+    Object.assign(unsaved.current, changes);
+    setCutoffMsg("Saving…");
+    clearTimeout(saveTimer.current);
+    saveTimer.current = setTimeout(async () => {
+      const sending = unsaved.current;
+      unsaved.current = {};
+      const res = await fetch("/api/cutoffs", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ cutoffs: sending }),
+      }).catch(() => null);
+      if (res?.ok) {
+        setCutoffMsg("Saved for everyone.");
+      } else {
+        unsaved.current = { ...sending, ...unsaved.current };
+        setCutoffMsg("Could not save the cutoffs. Move a slider to try again.");
+      }
+    }, 500);
+  }
+  const setCutoff = (year, value) => setCutoffsAndSave({ [year]: value });
 
   const graded = useMemo(
     () =>
@@ -586,13 +625,18 @@ export default function RankingsClient({ applicants: saved, isAdmin }) {
               No graded applicants match these filters.
             </div>
           )}
+          <div className="save-note" style={{ marginTop: 6 }}>
+            {cutoffMsg || "Cutoffs are shared: moving one moves it for everyone."}
+          </div>
           {!singleYear && (
             <button
               className="btn"
               style={{ marginTop: 12, padding: "7px 12px" }}
-              onClick={() =>
-                setCutoffs(Object.fromEntries(allYears.map((y) => [y, DEFAULT_CUTOFF])))
-              }
+              onClick={() => {
+                if (window.confirm(`Set every year's cutoff back to ${DEFAULT_CUTOFF} for everyone?`)) {
+                  setCutoffsAndSave(Object.fromEntries(allYears.map((y) => [y, DEFAULT_CUTOFF])));
+                }
+              }}
             >
               Reset all to {DEFAULT_CUTOFF}
             </button>
