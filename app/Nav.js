@@ -35,12 +35,11 @@ function navGroups(grader) {
     },
     {
       key: "event",
-      label: "Group work",
-      // In the order the event runs: plan it, then on the day check people in
+      label: "Meet and greet",
+      // In the order the event runs: who is coming, then on the day check people in
       // (with their photo), take notes in your group, rate at the end.
       items: [
-        { href: "/event", label: "Overview" },
-        grader?.isAdmin && { href: "/cohorts", label: "Cohorts" },
+        grader?.isAdmin && { href: "/cohorts", label: "Sessions" },
         { href: "/groups", label: "Groups" },
         { href: "/mugshots", label: "Mugshots" },
         { href: "/my-group", label: "My group" },
@@ -101,7 +100,7 @@ export default function Nav({ grader }) {
     <nav className="nav" ref={navRef}>
       {/* Phones: brand, where you are, and a menu with every page. */}
       <div className="nav-mobile">
-        <Link href="/event" className="nav-brand">
+        <Link href="/" className="nav-brand">
           NOVA
         </Link>
         <span className="nav-here">{current?.label || (path === "/settings" ? "Settings" : "")}</span>

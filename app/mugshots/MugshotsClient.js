@@ -28,7 +28,7 @@ export default function MugshotsClient({ cohorts, cohortId, people }) {
     return (
       <div className="page">
         <h1>Mugshots</h1>
-        <div className="card">No cohorts have been set up yet.</div>
+        <div className="card">No sessions yet. An admin reads them from the sign-up sheet.</div>
       </div>
     );
   }
@@ -108,9 +108,9 @@ export default function MugshotsClient({ cohorts, cohortId, people }) {
       </div>
 
       <div className="checkin-list">
-        {people.length === 0 && <div className="empty">Nobody is in this cohort yet.</div>}
+        {people.length === 0 && <div className="empty">Nobody is in this session yet.</div>}
         {people.length > 0 && shown.length === 0 && (
-          <div className="empty">{q.trim() ? "No one in this cohort matches that." : "Nobody here."}</div>
+          <div className="empty">{q.trim() ? "No one in this session matches that." : "Nobody here."}</div>
         )}
         {shown.map((p) => (
           <button key={p.id} type="button" className="checkin-row" onClick={() => setOpenId(p.id)}>
@@ -216,7 +216,7 @@ function Person({ person, onBack, onChange }) {
       <section className="card schedule">
         <h3>Their groups</h3>
         {person.schedule.length === 0 ? (
-          <div className="muted">Rounds haven&apos;t been planned for this cohort yet.</div>
+          <div className="muted">Rounds haven&apos;t been planned for this session yet.</div>
         ) : (
           person.schedule.map((s) => (
             <div className="schedule-row" key={s.round}>

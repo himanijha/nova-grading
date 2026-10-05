@@ -1,81 +1,9 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import {
-  seededRandom,
-  assignCohorts,
-  generateRound,
-  matchAvailability,
-} from "../lib/grouping.js";
+import { seededRandom, generateRound } from "../lib/grouping.js";
 import { groupSymbol } from "../lib/symbols.js";
 
 const ids = (n, p = "a") => Array.from({ length: n }, (_, i) => `${p}${i}`);
-
-// --- cohort matching ---------------------------------------------------------
-
-test("people with one option get that option even when it is the busiest", () => {
-  const people = [
-    ...ids(5, "flex").map((id) => ({ id, available: ["sat", "sun"] })),
-    { id: "only-sat", available: ["sat"] },
-  ];
-  const { placed } = assignCohorts(people, [{ id: "sat" }, { id: "sun" }], {
-    rng: seededRandom(1),
-  });
-  assert.equal(placed.get("only-sat"), "sat");
-});
-
-test("cohorts stay balanced when everyone is flexible", () => {
-  const people = ids(90).map((id) => ({ id, available: ["a", "b", "c"] }));
-  const { placed } = assignCohorts(people, [{ id: "a" }, { id: "b" }, { id: "c" }], {
-    rng: seededRandom(2),
-  });
-  const counts = { a: 0, b: 0, c: 0 };
-  for (const c of placed.values()) counts[c]++;
-  assert.deepEqual(counts, { a: 30, b: 30, c: 30 });
-});
-
-test("capacity is a hard limit and overflow is reported", () => {
-  const people = ids(5).map((id) => ({ id, available: ["small"] }));
-  const { placed, unplaced } = assignCohorts(people, [{ id: "small", capacity: 3 }], {
-    rng: seededRandom(3),
-  });
-  assert.equal(placed.size, 3);
-  assert.equal(unplaced.length, 2);
-});
-
-test("existing members count toward a cohort's load", () => {
-  const people = ids(4).map((id) => ({ id, available: ["a", "b"] }));
-  const { placed } = assignCohorts(people, [{ id: "a" }, { id: "b" }], {
-    rng: seededRandom(4),
-    existing: { a: 4, b: 0 },
-  });
-  assert.deepEqual([...placed.values()], ["b", "b", "b", "b"]);
-});
-
-test("people with no available slot are unplaced", () => {
-  const { placed, unplaced } = assignCohorts(
-    [{ id: "x", available: [] }],
-    [{ id: "a" }],
-    { rng: seededRandom(5) }
-  );
-  assert.equal(placed.size, 0);
-  assert.deepEqual(unplaced, ["x"]);
-});
-
-// --- availability text matching ----------------------------------------------
-
-test("availability matches cohort text case-insensitively, commas and all", () => {
-  const cohorts = [
-    { id: "a", match: "Sat, Oct 4, 10am" },
-    { id: "b", match: "sun, oct 5, 2pm" },
-  ];
-  assert.deepEqual(matchAvailability("Sat, Oct 4, 10am, Sun, Oct 5, 2pm", cohorts), ["a", "b"]);
-  assert.deepEqual(matchAvailability("SUN, OCT 5, 2PM", cohorts), ["b"]);
-  assert.deepEqual(matchAvailability("", cohorts), []);
-});
-
-test("an empty match text never matches", () => {
-  assert.deepEqual(matchAvailability("anything", [{ id: "a", match: "  " }]), []);
-});
 
 // --- round generation --------------------------------------------------------
 

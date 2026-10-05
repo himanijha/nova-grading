@@ -44,9 +44,9 @@ npm run build && npm start     # production build
 npm run seed:demo -- 60        # a specific number of fake applicants
 npm run seed:demo -- 24 wipe   # remove the previous demo data first
 npm run seed:demo -- 0 wipe    # clear demo data without adding more
-npm run seed:event             # a fake group work event on top of the demo applicants
+npm run seed:event             # a fake meet and greet on top of the demo applicants
 npm run seed:event -- wipe     # remove the fake event
-npm test                       # unit tests for cohort matching and group mixing
+npm test                       # unit tests for reading the sign-up sheet and group mixing
 ```
 
 Demo applicants use `@demo.ucla.edu` emails and demo graders use `@nova.demo`,
@@ -102,43 +102,44 @@ applicant you haven't graded yet. Each grader has one grade per applicant;
 saving again updates it.
 
 **Interview candidates** — ranks people by the thumbs given on Rate after the
-group work event and *ignores the
+meet and greet and *ignores the
 application scores entirely*. The number is the average across everyone who
 rated them: double thumbs up is 3, thumbs up 2, maybe 1, thumbs down 0. An
 average rather than a total, so someone three people loved is not buried by
 someone six people shrugged at — the rater count sits alongside so thin evidence
 stays visible. Click the thumbs in a row to read their reasons and the notes
-written during group work.
+written during the meet and greet.
 
-### The group work event
+### The meet and greet
 
-**Group work → Overview** walks through the whole stage in order, with live
-progress for each step. On a phone, the nav folds into ☰ and a bottom tab bar
-holds the three screens used on the day: Mugshots, My group, Rate.
+On a phone, the nav folds into ☰ and a bottom tab bar holds the three screens
+used on the day: Mugshots, My group, Rate.
 
-After screening, the people who pass come to a one-hour group work session.
-Each session is a **cohort** (a time slot, ~100 people in one room). The hour
+The people coming to the meet and greet sign themselves up on a Google Sheet:
+one column per session, with the day and room on the first row, the time on
+the second, and names underneath. That sheet is the only say on who comes and
+when. Each **session** is about an hour with everyone in one room. The hour
 has several **rounds**; each round splits the room into small groups named by a
 colour and shape — Green Circle, Blue Star, Yellow Triangle — and people move
 to a new symbol between rounds. Graders stay at one symbol for the whole hour.
 
-1. **Save the screening result (Rankings, admins).** Set the per-year cutoffs,
-   then *Save these cutoffs as the result*: everyone shown above their year's
-   cutoff is marked passed, everyone below not passed. The Result column lets
-   you override anyone by hand. Only passed applicants can go into a cohort.
-2. **Cohorts (admins).** Add one cohort per time slot. Send the people who
-   passed a form asking which times they can make, then upload its CSV here:
-   rows are matched to applicants by email, and each person is placed in one
-   slot they can make — people with the fewest options first, then the
-   emptiest slot, respecting any capacity. Review the proposal, change anyone,
-   and confirm; nothing is saved before that. Re-run it for late responses with
-   *leave people who are already in a cohort where they are*. A plain
-   `email, cohort` CSV works too. Anyone can also be moved by hand.
+1. **Import the applications (Forms → Import CSV).** Names on the sheet are
+   tied to applications, so the applications have to be in first.
+2. **Sessions (admins).** Paste the sheet's link (shared as "Anyone with the
+   link") and press *Read sheet*. Every column with a time above it becomes a
+   session, with its day, room and start time read from the headers (times are
+   taken as Los Angeles time, in the current year). Each name goes to the
+   applicant with exactly that name — ignoring capitals, accents and
+   punctuation — and that applicant is marked as having passed screening.
+   Names with no exact match are listed under *names without an application*,
+   with likely candidates suggested; pick the right application and they join
+   their session. The choice is remembered. *Refresh from sheet* reads it
+   again: people already in the right session keep their check-in and groups.
 3. **Groups (admins plan, everyone views).** Set how many groups the room has
    and which graders sit at each symbol, then *Plan rounds*. Each round is mixed
    against the earlier ones, so people meet new people and new graders. Drag
    people between groups (or use ⇄), reshuffle one round, add or delete rounds.
-   *Schedule CSV* on the Cohorts page exports everyone's group for each round,
+   *Schedule CSV* on the Sessions page exports everyone's group for each round,
    for the email telling them where to go.
 4. **Mugshots (phones).** At the door: search the name, tap, take the
    photo with the back camera, so every grader has a face to put to their
@@ -157,7 +158,7 @@ to a new symbol between rounds. Graders stay at one symbol for the whole hour.
 add or remove graders, see grading progress, and generate password reset links.
 
 The nav groups these by stage: **Forms** (Import CSV, admins only),
-**Applications** (Grading, Rankings), **Group work** (Overview, Cohorts,
+**Applications** (Grading, Rankings), **Meet and greet** (Sessions,
 Groups, Mugshots, My group, Rate), **Coffee chats** (Interview
 candidates),
 then Settings.
@@ -266,7 +267,9 @@ provider's own snapshots.
   the event: Cohort, CohortMember, Group, GroupGrader, Round, Placement, Note
 - `prisma/migrations/` — schema history; apply with `prisma migrate deploy`
 - `lib/mapping.js` — CSV header matching, role categorising, Drive URL handling
-- `lib/grouping.js` — cohort matching and round mixing (pure; tested in `tests/`)
+- `lib/grouping.js` — round mixing (pure; tested in `tests/`)
+- `lib/signups.js` — reading the sign-up sheet and matching names (pure; tested in `tests/`);
+  `lib/sheet.js` writes the result to the database
 - `lib/symbols.js` — the colour + shape each group goes by
 - `app/cohorts/`, `app/groups/`, `app/mugshots/`, `app/my-group/`, `app/rate/` — the event
 - `app/rankings/` — the ranking + cutoff screen

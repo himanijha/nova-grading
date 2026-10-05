@@ -341,7 +341,7 @@ export default function InterviewClient({ applicants }) {
                           ))}
                           {a.eventNotes.length > 0 && (
                             <div className="note-group">
-                              <div className="note-group-title">During group work</div>
+                              <div className="note-group-title">During the meet and greet</div>
                               {a.eventNotes.map((n, k) => (
                                 <div className="note-line" key={k}>
                                   <strong>{n.graderName}</strong>

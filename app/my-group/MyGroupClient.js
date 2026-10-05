@@ -44,7 +44,7 @@ export default function MyGroupClient({
     return (
       <div className="page">
         <h1>My group</h1>
-        <div className="card">No cohorts have been set up yet.</div>
+        <div className="card">No sessions yet. An admin reads them from the sign-up sheet.</div>
       </div>
     );
   }
@@ -72,7 +72,7 @@ export default function MyGroupClient({
       )}
 
       {rounds.length === 0 ? (
-        <div className="card">Rounds haven&apos;t been planned for this cohort yet.</div>
+        <div className="card">Rounds haven&apos;t been planned for this session yet.</div>
       ) : (
         <div className="seg round-seg">
           {rounds.map((r) => (
@@ -94,7 +94,7 @@ export default function MyGroupClient({
           </>
         ) : (
           <div>
-            <strong>You aren&apos;t assigned to a group in this cohort.</strong>
+            <strong>You aren&apos;t assigned to a group in this session.</strong>
             <div className="muted small">Pick one below to take notes for it.</div>
           </div>
         )}

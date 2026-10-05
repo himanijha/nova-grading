@@ -45,8 +45,8 @@ export default function GroupsClient({ cohorts, cohortId, board, graders, isAdmi
       <div className="page">
         <h1>Groups</h1>
         <div className="card">
-          No cohorts yet.{" "}
-          {isAdmin ? <Link href="/cohorts">Create the time slots first.</Link> : "An admin sets them up."}
+          No sessions yet.{" "}
+          {isAdmin ? <Link href="/cohorts">Read the sign-up sheet first.</Link> : "An admin sets them up."}
         </div>
       </div>
     );
@@ -97,8 +97,8 @@ export default function GroupsClient({ cohorts, cohortId, board, graders, isAdmi
           <div className="empty">
             {board.groups.length === 0
               ? isAdmin
-                ? "Set how many groups this cohort has, then plan the rounds."
-                : "An admin hasn't set up groups for this cohort yet."
+                ? "Set how many groups this session has, then plan the rounds."
+                : "An admin hasn't set up groups for this session yet."
               : isAdmin
               ? "Plan the rounds above."
               : "No rounds planned yet."}
@@ -151,7 +151,7 @@ function Setup({ board, graders, act, busy }) {
         <span className="muted small">
           {per
             ? `${n} people → ${Math.floor(per)}${per % 1 ? `–${Math.ceil(per)}` : ""} per group`
-            : `${n} people in this cohort`}
+            : `${n} people in this session`}
           {board.rounds.length > 0 &&
             " · a removed group's people move to the smallest groups; a new group starts empty until you reshuffle"}
         </span>
