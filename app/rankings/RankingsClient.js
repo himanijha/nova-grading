@@ -170,7 +170,7 @@ function SaveResult({ shown, isAbove, counts, onSaved }) {
           <p>
             Mark <strong>{pass}</strong> passed and <strong>{fail}</strong> not passed? Only the{" "}
             {shown.length} graded applicants shown with the current filters change. Anyone marked
-            not passed leaves their group work cohort.
+            not passed leaves their meet and greet session.
           </p>
           <div className="btn-row">
             <button className="btn" disabled={busy} onClick={() => setAsking(false)}>

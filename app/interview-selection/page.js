@@ -23,7 +23,7 @@ export default async function InterviewSelectionPage() {
       ratings: {
         select: { value: true, note: true, grader: { select: { name: true } } },
       },
-      // What graders jotted during the group work rounds, read alongside
+      // What graders jotted during the meet and greet rounds, read alongside
       // the thumbs they gave afterwards.
       notes: {
         orderBy: { createdAt: "asc" },

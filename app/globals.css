@@ -1383,7 +1383,7 @@ input.inp.big { font-size: 17px; padding: 14px 16px; border-radius: 12px; backgr
 .face .mug-avatar { border-radius: 16px; }
 .person-card { scroll-margin-top: 64px; }
 
-/* Group work overview ---------------------------------------------------------- */
+/* Meet and greet overview ---------------------------------------------------------- */
 .event { max-width: 760px; }
 .step {
   display: grid;

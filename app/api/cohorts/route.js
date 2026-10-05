@@ -1,16 +1,8 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
-import { bad, clearPlacements, gate } from "@/lib/event";
-
-function parseFields(body) {
-  const name = String(body.name ?? "").trim();
-  const startsAt = body.startsAt ? new Date(body.startsAt) : null;
-  const capacity =
-    body.capacity === "" || body.capacity == null ? null : Math.floor(Number(body.capacity));
-  if (startsAt && Number.isNaN(startsAt.getTime())) return { error: "That start time is not a date." };
-  if (capacity !== null && !(capacity > 0)) return { error: "Capacity must be a positive number." };
-  return { name, startsAt, capacity };
-}
+import { bad, gate } from "@/lib/event";
+import { syncSheet } from "@/lib/sheet";
+import { normalizeName } from "@/lib/signups";
 
 export async function POST(req) {
   const { error } = await gate({ admin: true });
@@ -18,65 +10,56 @@ export async function POST(req) {
 
   const body = await req.json().catch(() => ({}));
 
-  if (body.action === "create" || body.action === "update") {
-    const f = parseFields(body);
-    if (f.error) return bad(f.error);
-    if (!f.name) return bad("Give the cohort a name, like “Sat 10am”.");
-    const data = { name: f.name, startsAt: f.startsAt, capacity: f.capacity };
-    if (body.action === "create") {
-      const c = await prisma.cohort.create({ data });
-      return NextResponse.json({ ok: true, id: c.id });
+  // { url? } — read the sheet again; with a url, read that sheet from now on.
+  if (body.action === "sync") {
+    const url = String(body.url ?? "").trim() || (await prisma.eventSheet.findUnique({ where: { id: "main" } }))?.url;
+    if (!url) return bad("Paste the sign-up sheet's link first.");
+    const r = await syncSheet(url);
+    if (r.error) return bad(r.error);
+    return NextResponse.json({ ok: true, ...r });
+  }
+
+  // { signupId, applicantId } — say whose application a sheet name belongs to.
+  // Remembered by name, so the next read of the sheet doesn't ask again.
+  if (body.action === "match") {
+    const [signup, applicant] = await Promise.all([
+      prisma.signup.findUnique({ where: { id: String(body.signupId ?? "") } }),
+      prisma.applicant.findUnique({
+        where: { id: String(body.applicantId ?? "") },
+        select: { id: true, fullName: true, cohort: { select: { cohort: { select: { name: true } } } } },
+      }),
+    ]);
+    if (!signup) return bad("That name has already been dealt with. Reload the page.", 404);
+    if (!applicant) return bad("That applicant no longer exists.", 404);
+    if (applicant.cohort) {
+      return bad(`${applicant.fullName} is already in ${applicant.cohort.cohort.name}. One application can't be two people.`);
     }
-    await prisma.cohort.update({ where: { id: body.cohortId }, data });
+
+    const name = normalizeName(signup.name);
+    await prisma.$transaction([
+      prisma.nameMatch.upsert({
+        where: { name },
+        create: { name, applicantId: applicant.id },
+        update: { applicantId: applicant.id },
+      }),
+      prisma.cohortMember.create({ data: { applicantId: applicant.id, cohortId: signup.cohortId } }),
+      prisma.applicant.update({ where: { id: applicant.id }, data: { screeningStatus: "PASSED" } }),
+      prisma.signup.delete({ where: { id: signup.id } }),
+    ]);
     return NextResponse.json({ ok: true });
   }
 
+  // Only for a session that isn't on the sheet (an old or demo one). Members,
+  // groups, rounds and placements go with it; notes survive, just without the
+  // round they were written in.
   if (body.action === "delete") {
-    // Members, groups, rounds and placements go with it; notes survive, just
-    // without the round they were written in.
+    const cohort = await prisma.cohort.findUnique({
+      where: { id: String(body.cohortId ?? "") },
+      select: { sheetCol: true },
+    });
+    if (cohort && cohort.sheetCol != null) return bad("That session comes from the sheet. Remove its column there instead.");
     await prisma.cohort.delete({ where: { id: body.cohortId } }).catch(() => null);
     return NextResponse.json({ ok: true });
-  }
-
-  // { assignments: [{ applicantId, cohortId | null }] } — null takes someone
-  // out of every cohort.
-  if (body.action === "assign") {
-    const list = Array.isArray(body.assignments) ? body.assignments : [];
-    if (list.length === 0) return bad("Nothing to assign.");
-
-    const ids = list.map((a) => a.applicantId);
-    const passed = await prisma.applicant.findMany({
-      where: { id: { in: ids }, screeningStatus: "PASSED" },
-      select: { id: true },
-    });
-    const ok = new Set(passed.map((p) => p.id));
-    const refused = ids.filter((id) => !ok.has(id));
-    if (refused.length) {
-      return bad(`${refused.length} of these have not passed screening, so they can't join a cohort.`);
-    }
-
-    const current = await prisma.cohortMember.findMany({
-      where: { applicantId: { in: ids } },
-      select: { applicantId: true, cohortId: true },
-    });
-    const was = new Map(current.map((m) => [m.applicantId, m.cohortId]));
-    const changed = list.filter((a) => (was.get(a.applicantId) || null) !== (a.cohortId || null));
-
-    await prisma.$transaction(async (tx) => {
-      // A new cohort means a different room: the old groups no longer apply.
-      await clearPlacements(tx, changed.map((a) => a.applicantId));
-      await tx.cohortMember.deleteMany({
-        where: { applicantId: { in: changed.map((a) => a.applicantId) } },
-      });
-      const joining = changed.filter((a) => a.cohortId);
-      if (joining.length) {
-        await tx.cohortMember.createMany({
-          data: joining.map((a) => ({ applicantId: a.applicantId, cohortId: a.cohortId })),
-        });
-      }
-    });
-
-    return NextResponse.json({ ok: true, changed: changed.length });
   }
 
   return bad("Unknown action.");

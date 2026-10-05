@@ -5,7 +5,7 @@ import { SCREENING, bad, clearPlacements, gate } from "@/lib/event";
 /**
  * Save screening outcomes: { updates: [{ applicantId, status }] }.
  * Anyone who stops being PASSED leaves their cohort and groups — they are no
- * longer coming to the group work event.
+ * longer coming to the meet and greet.
  */
 export async function POST(req) {
   const { error } = await gate({ admin: true });

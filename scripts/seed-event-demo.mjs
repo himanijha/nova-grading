@@ -1,4 +1,4 @@
-// Sets up a fake group work event on top of the demo applicants, so the
+// Sets up a fake meet and greet on top of the demo applicants, so the
 // Cohorts, Groups, Check-in, My group and Rate pages have something to show.
 //
 // Usage:  npm run seed:demo -- 60 wipe   (demo applicants first — 60 is a good size)

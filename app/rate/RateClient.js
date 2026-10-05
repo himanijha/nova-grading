@@ -22,7 +22,7 @@ export default function RateClient({ cohorts, cohortId, people }) {
     return (
       <div className="page">
         <h1>Rate</h1>
-        <div className="card">No cohorts have been set up yet.</div>
+        <div className="card">No sessions yet. An admin reads them from the sign-up sheet.</div>
       </div>
     );
   }
@@ -41,7 +41,7 @@ export default function RateClient({ cohorts, cohortId, people }) {
       <h1>Rate</h1>
       <p className="sub">
         Give your thumbs once every round is done. You&apos;ve rated <strong>{rated}</strong> of{" "}
-        {pool.length} {scope === "mine" ? "people you watched" : "people in this cohort"}.
+        {pool.length} {scope === "mine" ? "people you watched" : "people in this session"}.
       </p>
 
       {cohorts.length > 1 && (
@@ -60,7 +60,7 @@ export default function RateClient({ cohorts, cohortId, people }) {
             I watched {watched.length}
           </button>
           <button className={scope === "all" ? "on" : ""} onClick={() => setScope("all")}>
-            Whole cohort {people.length}
+            Whole session {people.length}
           </button>
         </div>
         <div className="seg">
@@ -88,8 +88,8 @@ export default function RateClient({ cohorts, cohortId, people }) {
         <div className="empty">
           {pool.length === 0
             ? scope === "mine"
-              ? "You weren't at a group in this cohort. Switch to the whole cohort."
-              : "Nobody is in this cohort yet."
+              ? "You weren't at a group in this session. Switch to the whole session."
+              : "Nobody is in this session yet."
             : show === "todo"
             ? "All done here."
             : "Nobody matches."}
