@@ -19,9 +19,12 @@ model Grader {
   grades       Grade[]
   ratings      Rating[]
   photos       ApplicantPhoto[]
+  resumes      ApplicantResume[]
   resetTokens  PasswordResetToken[]
   groups       GroupGrader[]
   notes        Note[]
+  infoSessionEdits InfoSessionAttendee[] @relation("InfoSessionEdits")
+  infoSessionAdds  InfoSessionAttendee[] @relation("InfoSessionAdds")
 }
 
 model PasswordResetToken {
@@ -65,8 +68,14 @@ model Applicant {
   // the meet and greet sign-up sheet is marked PASSED too.
   screeningStatus String @default("PENDING") // PENDING | PASSED | REJECTED
 
+  // Set by dragging the applicant in Rankings: a stand-in for their average
+  // that sorts them where they were dropped and is judged against the cutoff.
+  // Null means they sit wherever their average puts them.
+  rankScore       Float?
+
   grades        Grade[]
   photo         ApplicantPhoto?
+  resume        ApplicantResume?
   ratings       Rating[]
   cohort        CohortMember?
   nameMatches   NameMatch[]
@@ -92,6 +101,44 @@ model ApplicantPhoto {
   uploadedById String?
   uploadedBy   Grader?  @relation(fields: [uploadedById], references: [id], onDelete: SetNull)
   updatedAt    DateTime @updatedAt
+}
+
+// The resume, uploaded from the zip of Google Form file responses. Kept in the
+// database for the same reasons as the photo: the Drive links in the CSV only
+// open for people the files were shared with, and hosted filesystems vanish.
+model ApplicantResume {
+  id           String   @id @default(cuid())
+  applicantId  String   @unique
+  applicant    Applicant @relation(fields: [applicantId], references: [id], onDelete: Cascade)
+
+  data         Bytes
+  mimeType     String
+  fileName     String
+  byteSize     Int
+  uploadedById String?
+  uploadedBy   Grader?  @relation(fields: [uploadedById], references: [id], onDelete: SetNull)
+  updatedAt    DateTime @updatedAt
+}
+
+// Pieces of a resume too big for one request (the platform caps bodies at
+// 4.5MB). They wait here until the last one arrives, then are joined into the
+// ApplicantResume and deleted.
+model ResumeUploadPart {
+  uploadId    String
+  index       Int
+  applicantId String
+  data        Bytes
+  createdAt   DateTime @default(now())
+
+  @@id([uploadId, index])
+}
+
+// The Rankings cutoff for one graduation year. Shared, so everyone looking at
+// Rankings sees the same line; a year with no row sits at the default.
+model RankingCutoff {
+  gradYear  String   @id
+  cutoff    Float
+  updatedAt DateTime @updatedAt
 }
 
 // Interview selection runs on these, not on the rubric scores. One per grader
@@ -135,6 +182,11 @@ model Grade {
   // criterion to 5, REJECT forces every criterion to 1. Whoever sets one must
   // explain it in overallNote, and the reason is readable from Rankings.
   autoDecision       String?  // ACCEPT | REJECT
+
+  // The grader's gut call on whether this person goes to the next round.
+  // Shown as a thumbs tally in Rankings but never feeds the average or the
+  // order. Null on grades saved before it existed.
+  nextRound          String?  // PASS | FAIL
 
   createdAt      DateTime @default(now())
   updatedAt      DateTime @updatedAt
@@ -283,4 +335,34 @@ model Note {
 
   @@index([applicantId])
   @@index([graderId])
+}
+
+// --- info session ------------------------------------------------------------
+//
+// Someone who came to an info session, from the sign-in sheet CSV or added by
+// hand by a grader who saw them there. Not linked
+// to an Applicant by id: most people come before they apply, so the match is
+// made by email (or failing that, name) whenever a page reads them — see
+// lib/infosession.js. That way a later application is picked up on its own.
+model InfoSessionAttendee {
+  id          String   @id @default(cuid())
+  // Lowercased. Optional for people added by hand; the sheet fills it in.
+  email       String?  @unique
+  name        String
+  // False for people a grader added before the sheet was imported. The import
+  // merges into them by name rather than adding them twice.
+  onSheet     Boolean  @default(false)
+  addedById   String?
+  addedBy     Grader?  @relation("InfoSessionAdds", fields: [addedById], references: [id], onDelete: SetNull)
+
+  // Shown in Rankings next to the graders' reviews.
+  note        String?
+  // Counts in Rankings exactly like an auto accept from the grading page.
+  // Requires a note, for the same reason.
+  autoAccept  Boolean  @default(false)
+  updatedById String?
+  updatedBy   Grader?  @relation("InfoSessionEdits", fields: [updatedById], references: [id], onDelete: SetNull)
+
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
 }

@@ -414,6 +414,31 @@ input[type="range"] {
 .rank-table .rank-name { font-weight: 600; }
 .rank-table .rank-name a { text-decoration: none; }
 .rank-table .rank-name a:hover { text-decoration: underline; }
+.rank-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+.rank-table .drag-cell { width: 28px; padding-right: 0; }
+.drag-handle {
+  border: 0;
+  background: none;
+  padding: 2px 4px;
+  border-radius: 6px;
+  color: var(--muted);
+  font: inherit;
+  letter-spacing: -0.2em;
+  cursor: grab;
+}
+.drag-handle:hover, .drag-handle:focus-visible { background: var(--accent-soft); color: var(--accent); }
+.drag-handle:active { cursor: grabbing; }
+.drag-none { color: var(--line); padding: 0 6px; }
+.rank-table tr.dragging { opacity: 0.4; }
+.rank-table tr.drop-before td { box-shadow: inset 0 2px 0 var(--accent); }
+.rank-table tr.drop-after td { box-shadow: inset 0 -2px 0 var(--accent); }
+.dtag.moved { background: var(--accent-soft); color: var(--accent); }
 .cut-line td {
   padding: 6px 8px;
   background: var(--accent-soft);
@@ -485,7 +510,8 @@ input[type="range"] {
 /* Auto accept / auto reject ------------------------------------------------
    An override of the rubric, so it reads as a decision rather than a score.
    Deliberately quiet: these are rare, and the table still ranks by number. */
-.auto-block { border-top: 1px solid var(--line); padding-top: 12px; }
+.auto-block,
+.next-round-block { border-top: 1px solid var(--line); padding-top: 12px; }
 .auto-row { display: flex; gap: 8px; flex-wrap: wrap; }
 .btn.auto { flex: 1 1 0; min-width: 120px; justify-content: center; }
 .btn.auto.accept.on {
@@ -521,6 +547,13 @@ textarea.inp.needed { border-color: var(--danger); }
 .dtag.clickable:hover { border-color: currentColor; }
 
 .note-row td { background: var(--bg); font-size: 13px; }
+
+/* Next-round thumbs tally in Rankings. Display only; never part of the rank. */
+.thumbs-cell { white-space: nowrap; }
+.thumb { display: inline-block; font-variant-numeric: tabular-nums; }
+.thumb + .thumb { margin-left: 8px; }
+.thumb.up { color: var(--good); }
+.thumb.down { color: var(--danger); }
 .note-line {
   display: flex;
   gap: 8px;
@@ -732,6 +765,16 @@ textarea.inp.needed { border-color: var(--danger); }
 .drop-big { font-weight: 600; font-size: 14px; }
 .drop-small { font-size: 12px; color: var(--muted); }
 
+.missing-resumes {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: 8px;
+  max-height: 360px;
+  overflow-y: auto;
+}
+.dropzone.missing-row { padding: 12px 10px; align-items: flex-start; text-align: left; }
+.dropzone.missing-row .drop-small { word-break: break-all; }
+
 .rate-row {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -876,6 +919,16 @@ textarea.inp.needed { border-color: var(--danger); }
   color: var(--ink);
   margin-bottom: 2px;
 }
+/* One grader's four scores, in the same order as the table's columns. */
+.review-scores {
+  display: flex;
+  gap: 14px;
+  flex-wrap: wrap;
+  padding: 2px 0 3px;
+  font-size: 12px;
+  color: var(--muted);
+}
+.review-scores strong { color: var(--ink); }
 /* Which criterion a note is about, held in a fixed column so a grader's five
    notes read as a list rather than a paragraph. */
 .note-label {
@@ -1450,3 +1503,19 @@ input.inp.big { font-size: 17px; padding: 14px 16px; border-radius: 12px; backgr
   font-size: 16px;
   font-variant-numeric: tabular-nums;
 }
+
+/* Info session ------------------------------------------------------------ */
+.info-star {
+  display: inline-block;
+  vertical-align: -3px;
+  margin-left: 5px;
+  flex-shrink: 0;
+}
+.info-star path { fill: #f59e0b; }
+.info-star text { fill: #fff; font: 700 10px -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; }
+.infosess .person-name { display: flex; align-items: center; justify-content: center; gap: 2px; }
+.infosess-note { margin-top: 16px; }
+.infosess-note textarea { width: 100%; min-height: 110px; }
+.note-group.infosess-review { background: #fffbeb; border-radius: 8px; padding: 6px 8px; }
+.infosess-note .auto-block { margin-top: 16px; }
+.infosess-add { margin-top: 14px; }

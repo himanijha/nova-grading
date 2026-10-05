@@ -1,0 +1,239 @@
+"use client";
+
+import { useRef, useState } from "react";
+import { useRouter } from "next/navigation";
+import { unzip } from "fflate";
+import { RESUME_TYPES, matchResume } from "@/lib/resumes";
+import { MAX_RESUME_LABEL } from "@/lib/upload";
+import { resumeProblem, uploadResume } from "@/lib/resume-client";
+import MissingResumes from "./MissingResumes";
+
+const unzipAsync = (bytes) =>
+  new Promise((resolve, reject) => unzip(bytes, (e, out) => (e ? reject(e) : resolve(out))));
+
+/**
+ * Drop the zip Google Drive gives you for the form's file-upload folder. It is
+ * unpacked here in the browser, each file is matched to an applicant by name,
+ * and after a look over the matches every resume is uploaded on its own.
+ */
+export default function ResumeZip({ applicants }) {
+  const router = useRouter();
+  const inputRef = useRef(null);
+  const [over, setOver] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const [msg, setMsg] = useState("");
+  const [files, setFiles] = useState(null);
+
+  async function onZip(file) {
+    if (!file) return;
+    setMsg("");
+    setFiles(null);
+    if (!/\.zip$/i.test(file.name)) return setMsg("That is not a .zip file.");
+
+    setBusy(true);
+    setMsg("Unzipping…");
+    let entries;
+    try {
+      entries = await unzipAsync(new Uint8Array(await file.arrayBuffer()));
+    } catch {
+      setBusy(false);
+      return setMsg("Could not read that zip.");
+    }
+    setBusy(false);
+
+    const list = Object.entries(entries)
+      .filter(([path, bytes]) => {
+        const name = path.split("/").pop();
+        // Folders, Mac resource forks and hidden files are not resumes.
+        return bytes.length > 0 && name && !name.startsWith(".") && !path.startsWith("__MACOSX/");
+      })
+      .map(([path, bytes]) => {
+        const name = path.split("/").pop();
+        const type = RESUME_TYPES[name.split(".").pop().toLowerCase()];
+        const problem = resumeProblem(name, bytes.length);
+        return {
+          name,
+          bytes,
+          type,
+          problem,
+          applicantId: problem ? "" : matchResume(name, applicants)?.id || "",
+          // Applicants who already have a resume are left alone unless asked.
+          replace: false,
+          status: "",
+        };
+      })
+      .sort((a, b) => a.name.localeCompare(b.name));
+
+    if (list.length === 0) return setMsg("No files found in that zip.");
+    setFiles(list);
+    const matched = list.filter((f) => f.applicantId).length;
+    const already = list.filter((f) => hasResume.has(f.applicantId)).length;
+    setMsg(
+      `${list.length} files found, ${matched} matched automatically` +
+        (already ? `, ${already} of them already have a resume and will be skipped` : "") +
+        ". Check the matches below."
+    );
+  }
+
+  const hasResume = new Set(applicants.filter((a) => a.hasResume).map((a) => a.id));
+  const willUpload = (f) =>
+    f.applicantId && !f.problem && f.status !== "Saved" && (f.replace || !hasResume.has(f.applicantId));
+
+  const setRow = (i, patch) =>
+    setFiles((fs) => fs.map((f, j) => (j === i ? { ...f, ...patch } : f)));
+
+  async function uploadAll() {
+    setBusy(true);
+    let ok = 0;
+    let failed = 0;
+    for (let i = 0; i < files.length; i++) {
+      const f = files[i];
+      if (!willUpload(f)) continue;
+      const r = await uploadResume(f.applicantId, new File([f.bytes], f.name, { type: f.type }), (status) =>
+        setRow(i, { status })
+      );
+      if (r.ok) {
+        ok++;
+        setRow(i, { status: "Saved" });
+      } else {
+        failed++;
+        setRow(i, { status: r.error });
+      }
+    }
+    setBusy(false);
+    setMsg(`${ok} resumes saved${failed ? `, ${failed} failed` : ""}.`);
+    router.refresh();
+  }
+
+  // Two files pointed at the same person would silently overwrite each other.
+  const counts = {};
+  for (const f of files || []) if (willUpload(f)) counts[f.applicantId] = (counts[f.applicantId] || 0) + 1;
+  const clashes = Object.values(counts).some((c) => c > 1);
+  const ready = (files || []).filter(willUpload).length;
+  const withResume = applicants.filter((a) => a.hasResume).length;
+  const sorted = [...applicants].sort((a, b) => a.fullName.localeCompare(b.fullName));
+
+  return (
+    <div className="card" style={{ marginTop: 32 }}>
+      <h3>Resumes</h3>
+      <p className="sub" style={{ margin: "0 0 12px" }}>
+        In Google Drive, download the form&rsquo;s resume upload folder as a zip and
+        drop it here. Each file is matched to an applicant by name; fix any that
+        are wrong before uploading. {withResume} of {applicants.length} applicants
+        have a resume so far. Applicants who already have one are skipped unless
+        you tick replace.
+      </p>
+
+      <MissingResumes
+        applicants={applicants}
+        pending={(files || []).filter((f) => f.applicantId && !f.problem && f.status !== "Saved")}
+      />
+
+      <div
+        className={`dropzone${over ? " over" : ""}${busy ? " busy" : ""}`}
+        onDragOver={(e) => {
+          e.preventDefault();
+          setOver(true);
+        }}
+        onDragLeave={() => setOver(false)}
+        onDrop={(e) => {
+          e.preventDefault();
+          setOver(false);
+          onZip(e.dataTransfer.files?.[0]);
+        }}
+        onClick={() => inputRef.current?.click()}
+        role="button"
+        tabIndex={0}
+        onKeyDown={(e) => {
+          if (e.key === "Enter" || e.key === " ") inputRef.current?.click();
+        }}
+      >
+        <input
+          ref={inputRef}
+          type="file"
+          accept=".zip,application/zip"
+          hidden
+          onChange={(e) => {
+            onZip(e.target.files?.[0]);
+            e.target.value = "";
+          }}
+        />
+        <span className="drop-big">Drag the resumes zip here</span>
+        <span className="drop-small">or click to choose it · each resume max {MAX_RESUME_LABEL}</span>
+      </div>
+
+      {msg && <div className="save-note">{msg}</div>}
+
+      {files && (
+        <>
+          <table className="tbl" style={{ marginTop: 12 }}>
+            <thead>
+              <tr>
+                <th>File</th>
+                <th>Applicant</th>
+                <th style={{ width: 160 }}>Status</th>
+              </tr>
+            </thead>
+            <tbody>
+              {files.map((f, i) => (
+                <tr key={f.name + i}>
+                  <td style={{ wordBreak: "break-all" }}>{f.name}</td>
+                  <td>
+                    {f.problem ? (
+                      <span className="err" style={{ margin: 0 }}>Skipped: {f.problem}</span>
+                    ) : (
+                      <select
+                        className="inp"
+                        value={f.applicantId}
+                        disabled={busy}
+                        onChange={(e) => setRow(i, { applicantId: e.target.value, replace: false, status: "" })}
+                        style={counts[f.applicantId] > 1 ? { borderColor: "var(--danger)" } : undefined}
+                      >
+                        <option value="">— don&rsquo;t upload —</option>
+                        {sorted.map((a) => (
+                          <option key={a.id} value={a.id}>
+                            {a.fullName} ({a.uclaEmail})
+                          </option>
+                        ))}
+                      </select>
+                    )}
+                  </td>
+                  <td>
+                    {f.status ||
+                      (hasResume.has(f.applicantId) && (
+                        <label style={{ display: "inline-flex", gap: 6, alignItems: "center" }}>
+                          <input
+                            type="checkbox"
+                            checked={f.replace}
+                            disabled={busy}
+                            onChange={(e) => setRow(i, { replace: e.target.checked })}
+                          />
+                          {f.replace ? "Will replace existing" : "Already has one · replace"}
+                        </label>
+                      ))}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+
+          {clashes && (
+            <div className="err">
+              Some applicants have more than one file matched (outlined in red). Pick
+              one per person.
+            </div>
+          )}
+
+          <button
+            className="btn primary"
+            style={{ marginTop: 12 }}
+            disabled={busy || clashes || ready === 0}
+            onClick={uploadAll}
+          >
+            {busy ? "Uploading…" : `Upload ${ready} resumes`}
+          </button>
+        </>
+      )}
+    </div>
+  );
+}

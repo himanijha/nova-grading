@@ -3,6 +3,7 @@ import { getCurrentGrader } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import { ratingScore, ratingTally } from "@/lib/ratings";
 import { normalizeGradYear } from "@/lib/mapping";
+import { infoSessionByApplicant } from "@/lib/infosession";
 import Nav from "../Nav";
 import InterviewClient from "./InterviewClient";
 
@@ -12,6 +13,7 @@ export default async function InterviewSelectionPage() {
   const grader = await getCurrentGrader();
   if (!grader) redirect("/login");
 
+  const infoSession = await infoSessionByApplicant();
   const rows = await prisma.applicant.findMany({
     select: {
       id: true,
@@ -46,6 +48,7 @@ export default async function InterviewSelectionPage() {
     gradYear: normalizeGradYear(a.gradYear) || "Unknown",
     majors: a.majors,
     roleCategory: a.roleCategory,
+    infoSession: infoSession.has(a.id),
     hasPhoto: !!a.photo,
     photoVersion: a.photo ? a.photo.updatedAt.getTime() : null,
     score: ratingScore(a.ratings),

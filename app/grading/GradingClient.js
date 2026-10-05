@@ -2,6 +2,8 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
+import { linkParts } from "@/lib/mapping";
+import InfoStar from "../InfoStar";
 
 const MAX_ROWS = 250;
 
@@ -72,7 +74,7 @@ function Essay({ q, a }) {
  */
 function Coverage({ coverage }) {
   const [open, setOpen] = useState(false);
-  const { total, targets, exact, threePlus } = coverage;
+  const { total, targets, exact, fivePlus } = coverage;
 
   // The one number worth reading without opening anything: how much of the pile
   // has not been touched at all.
@@ -129,7 +131,7 @@ function Coverage({ coverage }) {
               </span>
             ))}
             <span>
-              <strong>{threePlus}</strong> with 3 or more
+              <strong>{fivePlus}</strong> with 5 or more
             </span>
           </div>
         </div>
@@ -253,7 +255,10 @@ export default function GradingClient({
             onClick={() => setParam({ id: a.id })}
           >
             <div className="app-item-top">
-              <span className="app-item-name">{a.fullName}</span>
+              <span className="app-item-name">
+                {a.fullName}
+                {a.infoSession && <InfoStar size={15} />}
+              </span>
               {a.gradedByMe ? (
                 <span className="badge mine">Graded by you</span>
               ) : (
@@ -280,7 +285,10 @@ export default function GradingClient({
           </div>
         ) : (
           <>
-            <h1>{applicant.fullName}</h1>
+            <h1>
+              {applicant.fullName}
+              {applicant.infoSession && <InfoStar size={24} />}
+            </h1>
             <div style={{ color: "var(--muted)", marginBottom: 22 }}>
               Submitted {fmtDate(applicant.submittedAt)} ·{" "}
               {ROLE_LABEL[applicant.roleCategory]}
@@ -300,11 +308,17 @@ export default function GradingClient({
                 <Info label="Major(s)">{applicant.majors}</Info>
                 <Info label="Minor(s)">{applicant.minors}</Info>
                 <Info label="Links">
-                  {applicant.links ? (
-                    <a href={applicant.links} target="_blank" rel="noreferrer">
-                      {applicant.links}
-                    </a>
-                  ) : null}
+                  {applicant.links
+                    ? linkParts(applicant.links).map((part, i) =>
+                        part.href ? (
+                          <a key={i} href={part.href} target="_blank" rel="noreferrer">
+                            {part.text}
+                          </a>
+                        ) : (
+                          part.text
+                        )
+                      )
+                    : null}
                 </Info>
               </div>
             </section>
@@ -344,6 +358,10 @@ export default function GradingClient({
                     </a>
                   </div>
                 </>
+              ) : applicant.resumeFileName ? (
+                <a href={applicant.resumeUrl} target="_blank" rel="noreferrer">
+                  Download {applicant.resumeFileName} ↗
+                </a>
               ) : (
                 <div className="empty">No resume link on this application.</div>
               )}
@@ -388,6 +406,7 @@ function ScoringPanel({ grader, applicant, myGrade, list, onNavigate }) {
   const [msg, setMsg] = useState("");
   const [busy, setBusy] = useState(false);
   const [autoDecision, setAutoDecision] = useState(myGrade?.autoDecision || null);
+  const [nextRound, setNextRound] = useState(myGrade?.nextRound || null);
   const msgTimer = useRef(null);
 
   useEffect(() => () => clearTimeout(msgTimer.current), []);
@@ -413,6 +432,9 @@ function ScoringPanel({ grader, applicant, myGrade, list, onNavigate }) {
       return;
     }
     setAutoDecision(decision);
+    // An auto accept is a thumbs up and an auto reject a thumbs down; either
+    // can still be flipped by hand afterwards.
+    setNextRound(decision === "ACCEPT" ? "PASS" : "FAIL");
     const n = decision === "ACCEPT" ? 5 : 1;
     setScores({ technical: n, thoughtfulness: n, initiative: n, communityFit: n });
   }
@@ -425,6 +447,7 @@ function ScoringPanel({ grader, applicant, myGrade, list, onNavigate }) {
 
   async function save(advance) {
     if (!complete) return flash("Score all four criteria before saving.");
+    if (!nextRound) return flash("Give a final thumbs up or thumbs down.");
     if (autoDecision && !notes.overallNote.trim()) {
       return flash(
         `Explain this auto ${autoDecision === "ACCEPT" ? "accept" : "reject"} in the notes.`
@@ -434,7 +457,7 @@ function ScoringPanel({ grader, applicant, myGrade, list, onNavigate }) {
     const res = await fetch("/api/grades", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ applicantId: applicant.id, ...scores, ...notes, autoDecision }),
+      body: JSON.stringify({ applicantId: applicant.id, ...scores, ...notes, autoDecision, nextRound }),
     });
     setBusy(false);
 
@@ -538,6 +561,34 @@ function ScoringPanel({ grader, applicant, myGrade, list, onNavigate }) {
         </div>
       </div>
 
+      <div className="criterion next-round-block">
+        <div className="criterion-name">
+          Next round<span className="req"> — required</span>
+        </div>
+        <div className="criterion-desc">
+          Your final call: should they pass to the next round? Shown as a tally
+          in Rankings; it does not change the score or the ranking.
+        </div>
+        <div className="auto-row">
+          <button
+            type="button"
+            className={`btn auto accept${nextRound === "PASS" ? " on" : ""}`}
+            aria-pressed={nextRound === "PASS"}
+            onClick={() => setNextRound("PASS")}
+          >
+            👍 Pass
+          </button>
+          <button
+            type="button"
+            className={`btn auto reject${nextRound === "FAIL" ? " on" : ""}`}
+            aria-pressed={nextRound === "FAIL"}
+            onClick={() => setNextRound("FAIL")}
+          >
+            👎 Don&apos;t pass
+          </button>
+        </div>
+      </div>
+
       <div style={{ fontSize: 13, color: "var(--muted)" }}>
         Your total: <strong>{total}</strong> / 20
       </div>
@@ -572,6 +623,11 @@ function ScoringPanel({ grader, applicant, myGrade, list, onNavigate }) {
               {g.graderId === grader.id ? " (you)" : ""}
             </span>
             <span className="grader-scores">
+              {g.nextRound && (
+                <span title={g.nextRound === "PASS" ? "Pass" : "Don't pass"}>
+                  {g.nextRound === "PASS" ? "👍" : "👎"}{" "}
+                </span>
+              )}
               {g.autoDecision && (
                 <span className={`dtag ${g.autoDecision.toLowerCase()}`}>
                   {g.autoDecision === "ACCEPT" ? "auto accept" : "auto reject"}

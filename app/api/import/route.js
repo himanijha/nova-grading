@@ -24,6 +24,16 @@ const clean = (v) => {
   return s === "" ? null : s;
 };
 
+// True when a is known to be earlier than b. Missing timestamps never count as
+// older, so a row without one still refreshes the applicant.
+const isOlder = (a, b) => Boolean(a && b && a.getTime() < b.getTime());
+
+// roleCategory is included so a re-import picks up changes to how roles are
+// categorized, not just changes to the answers.
+const sameResponses = (existing, data) =>
+  ["fullName", "roleCategory", ...TEXT_FIELDS].every((f) => (existing[f] ?? null) === data[f]) &&
+  (existing.submittedAt?.getTime() ?? null) === (data.submittedAt?.getTime() ?? null);
+
 export async function POST(req) {
   const grader = await getCurrentGrader();
   if (!grader) return NextResponse.json({ error: "Not signed in." }, { status: 401 });
@@ -45,8 +55,12 @@ export async function POST(req) {
 
   let created = 0;
   let updated = 0;
+  let unchanged = 0;
   const skipped = [];
 
+  // Collapse the CSV to one row per email, keeping the latest submission, so
+  // someone who resubmitted is imported with their most recent answers.
+  const latest = new Map();
   for (let i = 0; i < rows.length; i++) {
     const row = rows[i];
     const uclaEmail = get(row, "uclaEmail");
@@ -58,16 +72,7 @@ export async function POST(req) {
     }
 
     const submittedAt = parseTimestamp(get(row, "submittedAt"));
-
-    // One row per person per submission time, so re-importing an updated
-    // export refreshes existing applicants instead of duplicating them.
-    const dedupeKey = crypto
-      .createHash("sha256")
-      .update(`${uclaEmail.toLowerCase()}|${submittedAt ? submittedAt.toISOString() : ""}`)
-      .digest("hex");
-
     const data = {
-      dedupeKey,
       uclaEmail: uclaEmail.toLowerCase(),
       fullName,
       submittedAt,
@@ -78,15 +83,47 @@ export async function POST(req) {
     // "2028 (Junior Transfer)" and friends collapse to one canonical cohort.
     data.gradYear = normalizeGradYear(data.gradYear);
 
-    const existing = await prisma.applicant.findUnique({ where: { dedupeKey } });
-    if (existing) {
-      await prisma.applicant.update({ where: { dedupeKey }, data });
-      updated++;
-    } else {
-      await prisma.applicant.create({ data });
-      created++;
-    }
+    const prev = latest.get(data.uclaEmail);
+    if (!prev || !isOlder(submittedAt, prev.submittedAt)) latest.set(data.uclaEmail, data);
   }
 
-  return NextResponse.json({ ok: true, created, updated, skipped });
+  for (const data of latest.values()) {
+    const existing = await prisma.applicant.findFirst({
+      where: { uclaEmail: data.uclaEmail },
+      orderBy: { submittedAt: "desc" },
+    });
+
+    if (!existing) {
+      const dedupeKey = crypto
+        .createHash("sha256")
+        .update(`${data.uclaEmail}|${data.submittedAt ? data.submittedAt.toISOString() : ""}`)
+        .digest("hex");
+      await prisma.applicant.create({ data: { ...data, dedupeKey } });
+      created++;
+      continue;
+    }
+
+    // Same person already in the database: refresh their answers if this
+    // submission is at least as new and something changed. Grades, ratings and
+    // the mugshot live in their own tables and are never touched here.
+    if (isOlder(data.submittedAt, existing.submittedAt) || sameResponses(existing, data)) {
+      unchanged++;
+      continue;
+    }
+    await prisma.applicant.update({ where: { id: existing.id }, data });
+    updated++;
+  }
+
+  return NextResponse.json({ ok: true, created, updated, unchanged, skipped });
+}
+
+// Wipes every application. Grades, ratings and mugshots cascade with them.
+export async function DELETE() {
+  const grader = await getCurrentGrader();
+  if (!grader) return NextResponse.json({ error: "Not signed in." }, { status: 401 });
+  if (!grader.isAdmin)
+    return NextResponse.json({ error: "Only admins can clear applications." }, { status: 403 });
+
+  const { count } = await prisma.applicant.deleteMany({});
+  return NextResponse.json({ ok: true, deleted: count });
 }

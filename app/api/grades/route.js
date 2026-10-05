@@ -30,6 +30,17 @@ export async function POST(req) {
     );
   }
 
+  // The final thumbs up or down. Required so every saved review carries one;
+  // Rankings tallies them but they never move anyone's score or place.
+  const nextRound =
+    body.nextRound === "PASS" || body.nextRound === "FAIL" ? body.nextRound : null;
+  if (!nextRound) {
+    return NextResponse.json(
+      { error: "Give a final thumbs up or thumbs down for the next round." },
+      { status: 400 }
+    );
+  }
+
   const notes = {};
   for (const key of [...CRITERIA.map((c) => `${c}Note`), "overallNote"]) {
     notes[key] = typeof body[key] === "string" ? body[key].trim() || null : null;
@@ -71,8 +82,8 @@ export async function POST(req) {
 
   const grade = await prisma.grade.upsert({
     where: { applicantId_graderId: { applicantId, graderId: grader.id } },
-    create: { applicantId, graderId: grader.id, ...scores, ...notes, autoDecision },
-    update: { ...scores, ...notes, autoDecision },
+    create: { applicantId, graderId: grader.id, ...scores, ...notes, autoDecision, nextRound },
+    update: { ...scores, ...notes, autoDecision, nextRound },
   });
 
   return NextResponse.json({ ok: true, gradeId: grade.id });

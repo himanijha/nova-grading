@@ -87,6 +87,7 @@ for (const g of data.grades) {
     initiativeNote: g.initiativeNote,
     communityFitNote: g.communityFitNote,
     overallNote: g.overallNote,
+    nextRound: g.nextRound ?? null,
   };
 
   await prisma.grade.upsert({

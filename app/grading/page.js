@@ -2,6 +2,8 @@ import { redirect } from "next/navigation";
 import { getCurrentGrader } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import { drivePreviewUrl } from "@/lib/mapping";
+import { EMBEDDABLE } from "@/lib/resumes";
+import { infoSessionByApplicant } from "@/lib/infosession";
 import Nav from "../Nav";
 import GradingClient from "./GradingClient";
 
@@ -27,16 +29,21 @@ export default async function GradingPage({ searchParams }) {
     ];
   }
 
-  const rows = await prisma.applicant.findMany({
-    where,
-    select: {
-      id: true,
-      fullName: true,
-      submittedAt: true,
-      roleCategory: true,
-      grades: { select: { graderId: true } },
-    },
-  });
+  const [rows, infoSession] = await Promise.all([
+    prisma.applicant.findMany({
+      where,
+      select: {
+        id: true,
+        fullName: true,
+        submittedAt: true,
+        roleCategory: true,
+        grades: { select: { graderId: true } },
+      },
+    }),
+    // Only the star: the info session note and auto accept are read in
+    // Rankings, so they can't anchor anyone's own scores here.
+    infoSessionByApplicant(),
+  ]);
 
   const list = rows.map((a) => ({
     id: a.id,
@@ -45,6 +52,7 @@ export default async function GradingPage({ searchParams }) {
     roleCategory: a.roleCategory,
     reviewCount: a.grades.length,
     gradedByMe: a.grades.some((g) => g.graderId === grader.id),
+    infoSession: infoSession.has(a.id),
   }));
 
   list.sort((a, b) => {
@@ -73,6 +81,7 @@ export default async function GradingPage({ searchParams }) {
           include: { grader: { select: { id: true, name: true, email: true } } },
           orderBy: { updatedAt: "desc" },
         },
+        resume: { select: { mimeType: true, fileName: true, updatedAt: true } },
       },
     });
 
@@ -89,6 +98,7 @@ export default async function GradingPage({ searchParams }) {
       applicant = {
         id: a.id,
         fullName: a.fullName,
+        infoSession: infoSession.has(a.id),
         uclaEmail: a.uclaEmail,
         contactEmail: a.contactEmail,
         pronouns: a.pronouns,
@@ -98,8 +108,18 @@ export default async function GradingPage({ searchParams }) {
         roleRaw: a.roleRaw,
         roleCategory: a.roleCategory,
         submittedAt: a.submittedAt ? a.submittedAt.toISOString() : null,
-        resumeUrl: a.resumeUrl,
-        resumeEmbedUrl: drivePreviewUrl(a.resumeUrl),
+        // An uploaded resume wins over the Drive link, which only opens for
+        // people the file was shared with.
+        ...(a.resume
+          ? (() => {
+              const url = `/api/resume/${a.id}?v=${a.resume.updatedAt.getTime()}`;
+              return {
+                resumeUrl: url,
+                resumeEmbedUrl: EMBEDDABLE.includes(a.resume.mimeType) ? url : null,
+                resumeFileName: a.resume.fileName,
+              };
+            })()
+          : { resumeUrl: a.resumeUrl, resumeEmbedUrl: drivePreviewUrl(a.resumeUrl) }),
         qLookingForward: a.qLookingForward,
         qInitiative: a.qInitiative,
         qCommunity: a.qCommunity,
@@ -123,6 +143,7 @@ export default async function GradingPage({ searchParams }) {
           communityFitNote: g.communityFitNote,
           overallNote: g.overallNote,
           autoDecision: g.autoDecision,
+          nextRound: g.nextRound,
           updatedAt: g.updatedAt.toISOString(),
         })),
       };
@@ -142,14 +163,14 @@ export default async function GradingPage({ searchParams }) {
   const coverage = {
     total: counts.length,
     // For each target: how many have reached it, and how many have not.
-    targets: [1, 2, 3].map((n) => ({
+    targets: [1, 2, 3, 4, 5].map((n) => ({
       n,
       have: counts.filter((c) => c >= n).length,
       left: counts.filter((c) => c < n).length,
     })),
-    // The exact spread, so "3" does not hide someone sitting on six reviews.
-    exact: [0, 1, 2].map((n) => ({ n, count: counts.filter((c) => c === n).length })),
-    threePlus: counts.filter((c) => c >= 3).length,
+    // The exact spread, so "5" does not hide someone sitting on eight reviews.
+    exact: [0, 1, 2, 3, 4].map((n) => ({ n, count: counts.filter((c) => c === n).length })),
+    fivePlus: counts.filter((c) => c >= 5).length,
   };
 
   return (

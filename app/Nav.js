@@ -5,18 +5,23 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 
 /**
- * The nav follows the shape of the season: forms come in, applications get
- * read, the people who pass come to the meet and greet, and the people who
- * shine there go to coffee chats. Grouping the pages that way
- * means a grader can find a page from the stage they are in, instead of
- * remembering which of seven flat links is the one they want.
+ * The nav follows the shape of the season: people come to an info session,
+ * forms come in, applications get read, the people who pass come to the group
+ * work event, and the people who shine there go to coffee chats. Grouping the
+ * pages that way means a grader can find a page from the stage they are in,
+ * instead of remembering which of seven flat links is the one they want.
  */
 function navGroups(grader) {
   return [
     {
+      key: "infosession",
+      label: "Info session",
+      items: [{ href: "/infosession", label: "Attendees" }],
+    },
+    {
       key: "forms",
       label: "Forms",
-      // Importing rewrites everybody's application; only admins do it.
+      // Importing and clearing applications is admin-only.
       hidden: !grader?.isAdmin,
       items: [{ href: "/import", label: "Import CSV" }],
     },
