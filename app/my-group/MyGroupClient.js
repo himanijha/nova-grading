@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { RATINGS } from "@/lib/ratings";
@@ -23,6 +23,21 @@ function shortNames(people) {
   );
 }
 
+/** POST/PATCH/DELETE some JSON; resolves to `{ data }` if it saved, `{ error }` if not. */
+async function send(method, url, body) {
+  try {
+    const res = await fetch(url, {
+      method,
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+    });
+    const data = await res.json().catch(() => ({}));
+    return res.ok ? { data } : { error: data.error || "Could not save." };
+  } catch {
+    return { error: "Could not save — check your connection." };
+  }
+}
+
 /**
  * What a grader looks at during a round: which symbol they are at, the faces
  * in front of them, and a place to jot something about each person and give
@@ -40,6 +55,16 @@ export default function MyGroupClient({
   people,
 }) {
   const router = useRouter();
+
+  // Cards show their own changes at once, so nothing waits on the server. This
+  // quietly re-reads the page a moment after the last save, so that coming
+  // back to it later doesn't show a copy from before the change.
+  const settleTimer = useRef(null);
+  useEffect(() => () => clearTimeout(settleTimer.current), []);
+  const settle = () => {
+    clearTimeout(settleTimer.current);
+    settleTimer.current = setTimeout(() => router.refresh(), 1500);
+  };
 
   if (empty) {
     return (
@@ -137,7 +162,7 @@ export default function MyGroupClient({
 
       <div className="stack">
         {people.map((p) => (
-          <PersonCard key={p.id} person={p} roundId={roundId} />
+          <PersonCard key={`${roundId}:${p.id}`} person={p} round={round} group={group} onSaved={settle} />
         ))}
       </div>
 
@@ -151,42 +176,98 @@ export default function MyGroupClient({
   );
 }
 
-function PersonCard({ person, roundId }) {
-  const router = useRouter();
+function PersonCard({ person, round, group, onSaved }) {
   const [draft, setDraft] = useState("");
-  const [busy, setBusy] = useState(false);
   const [err, setErr] = useState("");
+  // What the card shows is kept here and changed the moment you act; the save
+  // follows behind and only speaks up if it fails.
+  const [notes, setNotes] = useState(person.notes);
   const [value, setValue] = useState(person.myRating);
+  const savedValue = useRef(person.myRating);
+  const latestValue = useRef(person.myRating);
+  const tempId = useRef(0);
+  // One save at a time per card, in the order they were made, so a quick
+  // second tap can never be overtaken by the first.
+  const queue = useRef(Promise.resolve());
+  const enqueue = (job) => (queue.current = queue.current.then(job));
 
-  async function rate(next) {
-    const prev = value;
+  function rate(next) {
     setValue(next);
+    latestValue.current = next;
     setErr("");
-    const res = await fetch("/api/ratings", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ applicantId: person.id, value: next }),
+    enqueue(async () => {
+      const { error } = await send("POST", "/api/ratings", { applicantId: person.id, value: next });
+      if (!error) {
+        savedValue.current = next;
+        return onSaved();
+      }
+      // Fall back to the last thumbs that did save, unless a newer tap is on its way.
+      if (latestValue.current === next) {
+        latestValue.current = savedValue.current;
+        setValue(savedValue.current);
+      }
+      setErr(error);
     });
-    if (res.ok) return router.refresh();
-    const data = await res.json().catch(() => ({}));
-    setValue(prev);
-    setErr(data.error || "Could not save.");
   }
 
-  async function add() {
-    if (!draft.trim()) return;
-    setBusy(true);
-    setErr("");
-    const res = await fetch("/api/notes", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ applicantId: person.id, body: draft, roundId }),
-    });
-    const data = await res.json().catch(() => ({}));
-    setBusy(false);
-    if (!res.ok) return setErr(data.error || "Could not save.");
+  function add() {
+    const body = draft.trim();
+    if (!body) return;
+    const key = `new-${++tempId.current}`;
+    setNotes((list) => [
+      ...list,
+      {
+        key,
+        id: key,
+        body,
+        at: new Date().toISOString(),
+        round: round?.number ?? null,
+        group: group ? { color: group.color, shape: group.shape } : null,
+        pending: true,
+      },
+    ]);
     setDraft("");
-    router.refresh();
+    setErr("");
+    enqueue(async () => {
+      const { data, error } = await send("POST", "/api/notes", {
+        applicantId: person.id,
+        body,
+        roundId: round?.id,
+      });
+      if (!error) {
+        setNotes((list) => list.map((n) => (n.key === key ? { ...n, id: data.id, pending: false } : n)));
+        return onSaved();
+      }
+      // Hand the words back rather than lose them.
+      setNotes((list) => list.filter((n) => n.key !== key));
+      setDraft((d) => (d.trim() ? `${body}\n${d}` : body));
+      setErr(error);
+    });
+  }
+
+  function editNote(id, body) {
+    const before = notes.find((n) => n.id === id)?.body;
+    setNotes((list) => list.map((n) => (n.id === id ? { ...n, body } : n)));
+    setErr("");
+    enqueue(async () => {
+      const { error } = await send("PATCH", "/api/notes", { noteId: id, body });
+      if (!error) return onSaved();
+      setNotes((list) => list.map((n) => (n.id === id && n.body === body ? { ...n, body: before } : n)));
+      setErr(error);
+    });
+  }
+
+  function deleteNote(id) {
+    const at = notes.findIndex((n) => n.id === id);
+    const gone = notes[at];
+    setNotes((list) => list.filter((n) => n.id !== id));
+    setErr("");
+    enqueue(async () => {
+      const { error } = await send("DELETE", "/api/notes", { noteId: id });
+      if (!error) return onSaved();
+      setNotes((list) => [...list.slice(0, at), gone, ...list.slice(at)]);
+      setErr(error);
+    });
   }
 
   return (
@@ -207,7 +288,7 @@ function PersonCard({ person, roundId }) {
         </div>
       </div>
 
-      <NoteList notes={person.notes} mineOnly />
+      <NoteList notes={notes} mineOnly onEdit={editNote} onDelete={deleteNote} />
 
       <div className="note-compose">
         <textarea
@@ -217,8 +298,8 @@ function PersonCard({ person, roundId }) {
           value={draft}
           onChange={(e) => setDraft(e.target.value)}
         />
-        <button className="btn primary" disabled={busy || !draft.trim()} onClick={add}>
-          {busy ? "Saving…" : "Add note"}
+        <button className="btn primary" disabled={!draft.trim()} onClick={add}>
+          Add note
         </button>
       </div>
 
