@@ -10,7 +10,7 @@ import { Mugshot } from "../Mugshot";
 const ROLE_SHORT = {
   DEVELOPER: "Dev",
   DESIGNER: "Design",
-  BOTH: "Dev + Design",
+  BOTH: "Both",
   OTHER: "Other",
   UNKNOWN: "No role",
 };
@@ -429,11 +429,15 @@ function Board({ board, round, isAdmin, act }) {
     act({ action: "move", roundId: round.id, applicantId, groupId });
   }
 
+  // Same colours as the tag on each person, so the tally doubles as the key.
   const roleTally = (people) =>
     ROLE_ORDER.map((role) => [role, people.filter((m) => m.roleCategory === role).length])
       .filter(([, count]) => count > 0)
-      .map(([role, count]) => `${count} ${ROLE_SHORT[role]}`)
-      .join(" · ");
+      .map(([role, count]) => (
+        <span key={role} className={`role-tag role-${role}`}>
+          {count} {ROLE_SHORT[role]}
+        </span>
+      ));
 
   const columns = [
     ...board.groups.map((g) => ({ key: g.id, group: g, people: inGroup(g.id) })),
@@ -476,7 +480,7 @@ function Board({ board, round, isAdmin, act }) {
               {col.group.graders.length ? col.group.graders.map((g) => g.name).join(", ") : "No grader"}
             </div>
           )}
-          {col.people.length > 0 && <div className="muted small board-roles">{roleTally(col.people)}</div>}
+          {col.people.length > 0 && <div className="board-roles">{roleTally(col.people)}</div>}
           <div className="board-people">
             {col.people.map((m) => (
               <div
@@ -491,6 +495,7 @@ function Board({ board, round, isAdmin, act }) {
                   {m.fullName}
                   {m.checkedIn && <span className="arrived" title="Checked in">●</span>}
                 </span>
+                <span className={`role-tag role-${m.roleCategory}`}>{ROLE_SHORT[m.roleCategory]}</span>
                 {isAdmin && (
                   <>
                     <button
