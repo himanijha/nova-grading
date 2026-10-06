@@ -37,12 +37,17 @@ export async function POST(req) {
           for (const r of rounds) {
             const size = Object.fromEntries(kept.map((id) => [id, 0]));
             for (const p of r.placements) if (p.groupId in size) size[p.groupId]++;
+            // One update per receiving group rather than one per person.
+            const moved = {};
             for (const p of r.placements.filter((x) => removed.includes(x.groupId))) {
               const smallest = kept.reduce((a, id) => (size[id] < size[a] ? id : a), kept[0]);
               size[smallest]++;
-              await tx.placement.update({
-                where: { roundId_applicantId: { roundId: r.id, applicantId: p.applicantId } },
-                data: { groupId: smallest },
+              (moved[smallest] ||= []).push(p.applicantId);
+            }
+            for (const [groupId, applicantIds] of Object.entries(moved)) {
+              await tx.placement.updateMany({
+                where: { roundId: r.id, applicantId: { in: applicantIds } },
+                data: { groupId },
               });
             }
           }

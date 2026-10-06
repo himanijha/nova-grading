@@ -1232,6 +1232,8 @@ textarea.inp.needed { border-color: var(--danger); }
 .board-col.over { background: var(--accent-soft); }
 .board-head { display: flex; justify-content: space-between; align-items: center; gap: 8px; }
 .board-graders { margin: 2px 0 8px; }
+.board-roles { margin: 0 0 8px; font-variant-numeric: tabular-nums; }
+.board-graders + .board-roles { margin-top: -4px; }
 .board-people { display: flex; flex-direction: column; gap: 2px; }
 .board-person {
   position: relative;

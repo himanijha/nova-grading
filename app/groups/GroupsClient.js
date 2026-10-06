@@ -1,16 +1,30 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import GroupBadge from "../GroupBadge";
 import { Mugshot } from "../Mugshot";
 
-async function groupsApi(body) {
+// Short enough to fit a column of the board.
+const ROLE_SHORT = {
+  DEVELOPER: "Dev",
+  DESIGNER: "Design",
+  BOTH: "Dev + Design",
+  OTHER: "Other",
+  UNKNOWN: "No role",
+};
+const ROLE_ORDER = ["DEVELOPER", "DESIGNER", "BOTH", "OTHER", "UNKNOWN"];
+
+// How long the group count sits still before it is saved.
+const COUNT_SAVE_DELAY = 1500;
+
+async function groupsApi(body, { keepalive = false } = {}) {
   const res = await fetch("/api/groups", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(body),
+    keepalive,
   });
   const data = await res.json().catch(() => ({}));
   return res.ok ? { ok: true } : { ok: false, error: data.error || "Something went wrong." };
@@ -30,9 +44,85 @@ export default function GroupsClient({ cohorts, cohortId, board, graders, isAdmi
     }
   }, [board, roundId]);
 
+  // The group count is stepped locally and saved once it stops changing, so
+  // pressing + or − a few times costs one request, not one per press.
+  // `draftCount` is what the stepper shows while that is pending.
+  const [draftCount, setDraftCount] = useState(null);
+  const [savingCount, setSavingCount] = useState(false);
+  const wantCount = useRef(null);
+  const countTimer = useRef(null);
+  const countSave = useRef(null);
+  const savedCount = board?.groups.length ?? 0;
+  const savedCountRef = useRef(savedCount);
+  savedCountRef.current = savedCount;
+
+  function stepCount(next) {
+    setErr("");
+    wantCount.current = next;
+    setDraftCount(next);
+    clearTimeout(countTimer.current);
+    countTimer.current = setTimeout(saveCount, COUNT_SAVE_DELAY);
+  }
+
+  // Saves the pending count now. Presses that land while a save is in flight
+  // are picked up by the loop, so the last number pressed always wins.
+  function saveCount() {
+    clearTimeout(countTimer.current);
+    countTimer.current = null;
+    if (countSave.current) return countSave.current;
+    if (wantCount.current == null || wantCount.current === savedCountRef.current) {
+      return Promise.resolve();
+    }
+    countSave.current = (async () => {
+      setSavingCount(true);
+      let last = savedCountRef.current;
+      while (wantCount.current != null && wantCount.current !== last) {
+        const count = wantCount.current;
+        const r = await groupsApi({ cohortId, action: "setGroupCount", count });
+        if (!r.ok) {
+          setErr(r.error);
+          wantCount.current = null;
+          setDraftCount(null);
+          break;
+        }
+        last = count;
+      }
+      countSave.current = null;
+      setSavingCount(false);
+      router.refresh();
+    })();
+    return countSave.current;
+  }
+
+  // Once the page has caught up with the stepper there is nothing pending.
+  useEffect(() => {
+    if (draftCount != null && !savingCount && draftCount === savedCount) {
+      wantCount.current = null;
+      setDraftCount(null);
+    }
+  }, [draftCount, savingCount, savedCount]);
+
+  // Leaving with a count still waiting to be saved: send it on the way out.
+  useEffect(() => {
+    const sendPending = () => {
+      clearTimeout(countTimer.current);
+      const count = wantCount.current;
+      if (count == null || countSave.current || count === savedCountRef.current) return;
+      wantCount.current = null;
+      groupsApi({ cohortId, action: "setGroupCount", count }, { keepalive: true }).catch(() => {});
+    };
+    window.addEventListener("pagehide", sendPending);
+    return () => {
+      window.removeEventListener("pagehide", sendPending);
+      sendPending();
+    };
+  }, [cohortId]);
+
   async function act(body) {
     setErr("");
     setBusy(true);
+    // Everything else works on the groups as saved, so save the count first.
+    await saveCount();
     const r = await groupsApi({ cohortId, ...body });
     setBusy(false);
     if (!r.ok) setErr(r.error);
@@ -71,7 +161,16 @@ export default function GroupsClient({ cohorts, cohortId, board, graders, isAdmi
       </div>
 
       {isAdmin && (
-        <Setup board={board} graders={graders} act={act} busy={busy} />
+        <Setup
+          board={board}
+          graders={graders}
+          act={act}
+          busy={busy || savingCount}
+          count={draftCount ?? savedCount}
+          stepCount={stepCount}
+          stepping={busy}
+          pending={draftCount != null}
+        />
       )}
 
       {err && <div className="err" style={{ marginBottom: 12 }}>{err}</div>}
@@ -87,7 +186,7 @@ export default function GroupsClient({ cohorts, cohortId, board, graders, isAdmi
             {board.rounds.length === 0 && <span className="muted">No rounds planned yet.</span>}
           </div>
           {isAdmin && board.groups.length > 0 && (
-            <RoundActions board={board} round={round} act={act} busy={busy} />
+            <RoundActions board={board} round={round} act={act} busy={busy || savingCount} />
           )}
         </div>
 
@@ -111,11 +210,9 @@ export default function GroupsClient({ cohorts, cohortId, board, graders, isAdmi
 
 // --- how many groups, and who sits at each ---------------------------------
 
-function Setup({ board, graders, act, busy }) {
+function Setup({ board, graders, act, busy, count, stepCount, stepping, pending }) {
   const n = board.members.length;
-  const count = board.groups.length;
   const per = count ? n / count : null;
-  const setCount = (next) => act({ action: "setGroupCount", count: next });
 
   // Graders sit at one symbol for the whole hour, so each can be at only one
   // group per cohort. Map grader → the group they're already at.
@@ -125,16 +222,16 @@ function Setup({ board, graders, act, busy }) {
   return (
     <section className="card">
       <h3>Groups and graders</h3>
-      {/* A stepper that saves on each press, so the number shown is always
-          what the room actually has. */}
+      {/* The stepper moves straight away and saves once it has been left
+          alone for a moment; the groups below catch up when it has. */}
       <div className="setup-row">
         <span className="setup-label">Groups in the room</span>
         <div className="stepper">
           <button
             type="button"
             aria-label="One fewer group"
-            disabled={busy || count <= 1}
-            onClick={() => setCount(count - 1)}
+            disabled={stepping || count <= 1}
+            onClick={() => stepCount(count - 1)}
           >
             −
           </button>
@@ -142,8 +239,8 @@ function Setup({ board, graders, act, busy }) {
           <button
             type="button"
             aria-label="One more group"
-            disabled={busy || count >= 40}
-            onClick={() => setCount(count + 1)}
+            disabled={stepping || count >= 40}
+            onClick={() => stepCount(count + 1)}
           >
             +
           </button>
@@ -155,6 +252,7 @@ function Setup({ board, graders, act, busy }) {
           {board.rounds.length > 0 &&
             " · a removed group's people move to the smallest groups; a new group starts empty until you reshuffle"}
         </span>
+        {pending && <span className="muted small">Saving…</span>}
       </div>
 
       {board.groups.length > 0 && (
@@ -331,6 +429,12 @@ function Board({ board, round, isAdmin, act }) {
     act({ action: "move", roundId: round.id, applicantId, groupId });
   }
 
+  const roleTally = (people) =>
+    ROLE_ORDER.map((role) => [role, people.filter((m) => m.roleCategory === role).length])
+      .filter(([, count]) => count > 0)
+      .map(([role, count]) => `${count} ${ROLE_SHORT[role]}`)
+      .join(" · ");
+
   const columns = [
     ...board.groups.map((g) => ({ key: g.id, group: g, people: inGroup(g.id) })),
     ...(unplaced.length ? [{ key: "none", group: null, people: unplaced }] : []),
@@ -372,6 +476,7 @@ function Board({ board, round, isAdmin, act }) {
               {col.group.graders.length ? col.group.graders.map((g) => g.name).join(", ") : "No grader"}
             </div>
           )}
+          {col.people.length > 0 && <div className="muted small board-roles">{roleTally(col.people)}</div>}
           <div className="board-people">
             {col.people.map((m) => (
               <div

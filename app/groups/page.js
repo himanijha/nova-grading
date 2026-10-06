@@ -58,6 +58,7 @@ export default async function GroupsPage({ searchParams }) {
     <>
       <Nav grader={grader} />
       <GroupsClient
+        key={cohortId}
         cohorts={cohorts}
         cohortId={cohortId}
         board={board}
