@@ -101,7 +101,7 @@ comment each, plus overall notes. **Save & Next** saves and jumps to the next
 applicant you haven't graded yet. Each grader has one grade per applicant;
 saving again updates it.
 
-**Interview candidates** — ranks people by the thumbs given on Rate after the
+**Interview candidates** — ranks people by the thumbs given on My group during the
 meet and greet and *ignores the
 application scores entirely*. The number is the average across everyone who
 rated them: double thumbs up is 3, thumbs up 2, maybe 1, thumbs down 0. An
@@ -112,8 +112,8 @@ written during the meet and greet.
 
 ### The meet and greet
 
-On a phone, the nav folds into ☰ and a bottom tab bar holds the three screens
-used on the day: Mugshots, My group, Rate.
+On a phone, the nav folds into ☰ and a bottom tab bar holds the two screens
+used on the day: Mugshots, My group.
 
 The people coming to the meet and greet sign themselves up on a Google Sheet:
 one column per session, with the day and room on the first row, the time on
@@ -144,22 +144,21 @@ to a new symbol between rounds. Graders stay at one symbol for the whole hour.
 4. **Mugshots (phones).** At the door: search the name, tap, take the
    photo with the back camera, so every grader has a face to put to their
    notes. A photo marks them arrived. Anyone still missing one can be
-   photographed from their card on My group or Rate too. Their groups for each
+   photographed from their card on My group too. Their groups for each
    round are shown so you can tell them in person.
 5. **My group (phones).** During the rounds: the symbol you're at, the faces
-   in your group this round, and a note box for each person. Every note is
-   signed with your name and stamped with the round and group automatically.
-6. **Rate.** After the last round: everyone you watched, the whole room's
-   notes about them, who saw them in which round, and your thumbs. These are
-   the same ratings Interview candidates ranks by, which picks the coffee
-   chats. Other graders' thumbs stay hidden until you give yours.
+   in your group this round, and a note box and thumbs for each person. Every
+   note is signed with your name and stamped with the round and group
+   automatically. The thumbs — double thumbs up, thumbs up, maybe, thumbs
+   down — are the ratings Interview candidates ranks by, which picks the
+   coffee chats; you have one per person and can change it in any round.
 
 **Settings** — change your own password. Admins also get the grader roster:
 add or remove graders, see grading progress, and generate password reset links.
 
 The nav groups these by stage: **Forms** (Import CSV, admins only),
 **Applications** (Grading, Rankings), **Meet and greet** (Sessions,
-Groups, Mugshots, My group, Rate), **Coffee chats** (Interview
+Groups, Mugshots, My group), **Coffee chats** (Interview
 candidates),
 then Settings.
 
@@ -271,7 +270,7 @@ provider's own snapshots.
 - `lib/signups.js` — reading the sign-up sheet and matching names (pure; tested in `tests/`);
   `lib/sheet.js` writes the result to the database
 - `lib/symbols.js` — the colour + shape each group goes by
-- `app/cohorts/`, `app/groups/`, `app/mugshots/`, `app/my-group/`, `app/rate/` — the event
+- `app/cohorts/`, `app/groups/`, `app/mugshots/`, `app/my-group/` — the event
 - `app/rankings/` — the ranking + cutoff screen
 - `app/grading/` — the grading screen
 - `app/import/` — CSV upload and column mapping, admins only

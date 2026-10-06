@@ -256,7 +256,7 @@ export default function InterviewClient({ applicants }) {
         </h3>
         {shown.length === 0 ? (
           <div className="empty">
-            Nobody matches these filters yet. Rate people on the Mugshots page.
+            Nobody matches these filters yet. Give your thumbs on My group.
           </div>
         ) : (
           <table className="tbl rank-table">

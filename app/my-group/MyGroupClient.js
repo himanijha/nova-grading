@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
+import { RATINGS } from "@/lib/ratings";
 import GroupBadge from "../GroupBadge";
 import { Mugshot } from "../Mugshot";
 import NoteList from "../NoteList";
@@ -24,8 +25,8 @@ function shortNames(people) {
 
 /**
  * What a grader looks at during a round: which symbol they are at, the faces
- * in front of them, and a place to jot something about each person. Ratings
- * come later, on Rate, once every round is done.
+ * in front of them, and a place to jot something about each person and give
+ * their thumbs — the same ratings Interview candidates ranks by.
  */
 export default function MyGroupClient({
   empty,
@@ -142,8 +143,8 @@ export default function MyGroupClient({
 
       {round && group && people.length > 0 && (
         <p className="muted small center-text" style={{ marginTop: 20 }}>
-          Notes are signed with your name and stamped Round {round.number} · {group.name}. Give your
-          thumbs on <Link href="/rate">Rate</Link> once every round is done.
+          Notes are signed with your name and stamped Round {round.number} · {group.name}. Your
+          thumbs follow the person, so you can change them in any round.
         </p>
       )}
     </div>
@@ -155,6 +156,22 @@ function PersonCard({ person, roundId }) {
   const [draft, setDraft] = useState("");
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState("");
+  const [value, setValue] = useState(person.myRating);
+
+  async function rate(next) {
+    const prev = value;
+    setValue(next);
+    setErr("");
+    const res = await fetch("/api/ratings", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ applicantId: person.id, value: next }),
+    });
+    if (res.ok) return router.refresh();
+    const data = await res.json().catch(() => ({}));
+    setValue(prev);
+    setErr(data.error || "Could not save.");
+  }
 
   async function add() {
     if (!draft.trim()) return;
@@ -203,6 +220,21 @@ function PersonCard({ person, roundId }) {
         <button className="btn primary" disabled={busy || !draft.trim()} onClick={add}>
           {busy ? "Saving…" : "Add note"}
         </button>
+      </div>
+
+      <div className="rate-row">
+        {RATINGS.map((r) => (
+          <button
+            key={r.value}
+            type="button"
+            className={`rate-btn${value === r.value ? " on" : ""}`}
+            aria-pressed={value === r.value}
+            onClick={() => rate(value === r.value ? null : r.value)}
+          >
+            <span className="rate-icon">{r.icon}</span>
+            <span className="rate-text">{r.label}</span>
+          </button>
+        ))}
       </div>
       {err && <div className="err">{err}</div>}
     </section>

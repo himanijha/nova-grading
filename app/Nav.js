@@ -37,13 +37,12 @@ function navGroups(grader) {
       key: "event",
       label: "Meet and greet",
       // In the order the event runs: who is coming, then on the day check people in
-      // (with their photo), take notes in your group, rate at the end.
+      // (with their photo), then take notes and give your thumbs in your group.
       items: [
         grader?.isAdmin && { href: "/cohorts", label: "Sessions" },
         { href: "/groups", label: "Groups" },
         { href: "/mugshots", label: "Mugshots" },
         { href: "/my-group", label: "My group" },
-        { href: "/rate", label: "Rate" },
       ].filter(Boolean),
     },
     {
@@ -54,11 +53,10 @@ function navGroups(grader) {
   ].filter((g) => !g.hidden);
 }
 
-// The three screens used standing up at the event, one thumb away on a phone.
+// The two screens used standing up at the event, one thumb away on a phone.
 const TABS = [
   { href: "/mugshots", label: "Mugshots", icon: "📷" },
   { href: "/my-group", label: "My group", icon: "👥" },
-  { href: "/rate", label: "Rate", icon: "👍" },
 ];
 
 export default function Nav({ grader }) {

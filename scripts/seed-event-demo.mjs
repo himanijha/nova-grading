@@ -1,5 +1,5 @@
 // Sets up a fake meet and greet on top of the demo applicants, so the
-// Cohorts, Groups, Check-in, My group and Rate pages have something to show.
+// Cohorts, Groups, Check-in, and My group pages have something to show.
 //
 // Usage:  npm run seed:demo -- 60 wipe   (demo applicants first — 60 is a good size)
 //         npm run seed:event             (pass them, two cohorts, groups, 3 rounds)

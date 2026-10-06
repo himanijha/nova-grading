@@ -1369,8 +1369,8 @@ input.inp.big { font-size: 17px; padding: 14px 16px; border-radius: 12px; backgr
 }
 .schedule-row:last-child { border-bottom: 0; }
 
-/* My group / Rate (phone first) --------------------------------------------- */
-.mygroup, .rate { max-width: 640px; }
+/* My group (phone first) ---------------------------------------------------- */
+.mygroup { max-width: 640px; }
 .round-seg { margin-bottom: 12px; }
 .mygroup-head {
   display: flex;
@@ -1419,20 +1419,8 @@ input.inp.big { font-size: 17px; padding: 14px 16px; border-radius: 12px; backgr
   cursor: pointer;
 }
 .note-body { white-space: pre-wrap; line-height: 1.45; font-size: 14px; }
-.seen-by { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 6px; }
-.seen-chip {
-  display: inline-flex;
-  align-items: center;
-  gap: 3px;
-  font-size: 11px;
-  padding: 1px 7px;
-  border-radius: 999px;
-  background: #f1f0f5;
-  color: var(--muted);
-  white-space: nowrap;
-}
-.rate-card .rate-row { margin-top: 10px; }
-.rate-card .rate-btn { min-height: 44px; }
+.person-card .rate-row { margin: 10px 0 0; }
+.person-card .rate-btn { min-height: 44px; }
 
 .face-grid {
   display: grid;
