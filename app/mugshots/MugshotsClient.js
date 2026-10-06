@@ -15,7 +15,7 @@ const matches = (p, q) => {
 
 /**
  * The door. Built for one hand on a phone: search, tap the name, take the
- * photo, read them their groups, next.
+ * photo, read them their groups, then on to the next person down the list.
  */
 export default function MugshotsClient({ cohorts, cohortId, people }) {
   const router = useRouter();
@@ -45,15 +45,37 @@ export default function MugshotsClient({ cohorts, cohortId, people }) {
       (q.trim() || show === "all" || (show === "waiting" ? !p.checkedIn : p.checkedIn))
   );
 
-  function next() {
+  function backToList() {
     setOpenId(null);
     setQ("");
     // Straight back to typing the next name.
     setTimeout(() => searchRef.current?.focus(), 0);
   }
 
+  // Whoever follows them down the list you came from. The open person stays in
+  // the running even once they are marked arrived, so their place isn't lost.
+  const line = people.filter(
+    (p) => p.id === openId || show === "all" || (show === "waiting" ? !p.checkedIn : p.checkedIn)
+  );
+  const following = line[line.findIndex((p) => p.id === openId) + 1] || null;
+
   if (open) {
-    return <Person person={open} onBack={next} onChange={() => router.refresh()} />;
+    return (
+      <Person
+        key={open.id}
+        person={open}
+        onBack={backToList}
+        onNext={
+          following &&
+          (() => {
+            setQ("");
+            setOpenId(following.id);
+            window.scrollTo(0, 0);
+          })
+        }
+        onChange={() => router.refresh()}
+      />
+    );
   }
 
   return (
@@ -130,7 +152,7 @@ export default function MugshotsClient({ cohorts, cohortId, people }) {
   );
 }
 
-function Person({ person, onBack, onChange }) {
+function Person({ person, onBack, onNext, onChange }) {
   const cameraRef = useRef(null);
   const libraryRef = useRef(null);
   const [busy, setBusy] = useState(false);
@@ -227,8 +249,8 @@ function Person({ person, onBack, onChange }) {
         )}
       </section>
 
-      <button className="btn primary big wide" onClick={onBack}>
-        Next person
+      <button className="btn primary big wide" onClick={onNext || onBack}>
+        {onNext ? "Next person" : "Done — back to list"}
       </button>
     </div>
   );
