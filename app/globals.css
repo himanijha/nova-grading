@@ -1576,3 +1576,35 @@ input.inp.big { font-size: 17px; padding: 14px 16px; border-radius: 12px; backgr
 .delib-nudge { display: inline-flex; flex-direction: column; }
 .delib-nudge button { border: 0; background: none; color: var(--muted); cursor: pointer; font-size: 10px; line-height: 1; padding: 2px 4px; }
 .delib-nudge button:disabled { opacity: 0.3; cursor: default; }
+.delib-passed { margin-left: 6px; font-size: 11px; font-weight: 600; color: var(--good); background: var(--good-soft); border-radius: 999px; padding: 1px 7px; }
+.delib-pass { margin: 12px 0 4px; font-size: 14px; }
+.delib-pass .btn.on { border-color: var(--good); background: var(--good-soft); }
+
+/* ---------- coffee chat candidates ---------- */
+.ic-stats { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
+@media (max-width: 860px) { .ic-stats { grid-template-columns: 1fr; } }
+.ic-hero .hero-num { font-size: 40px; }
+.ic-years { grid-column: 1 / -1; }
+.ic-year-table { margin-top: 6px; }
+.ic-cols { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px; align-items: start; margin-top: 16px; }
+@media (max-width: 1100px) { .ic-cols { grid-template-columns: 1fr; } }
+.ic-col { margin: 0; }
+.ic-col-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 8px; }
+.ic-col-head h3 { margin: 0; }
+.ic-col-head select { max-width: 150px; }
+.ic-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; }
+.ic-item { border: 1px solid var(--line); border-radius: 10px; background: var(--panel); padding: 6px 8px; }
+.ic-item.dragging { opacity: 0.4; }
+.ic-item.drop { border-top: 3px solid var(--accent); }
+.ic-row { display: grid; grid-template-columns: auto auto auto minmax(0, 1fr); gap: 6px 8px; align-items: center; }
+.ic-who { min-width: 0; display: flex; flex-direction: column; }
+.ic-year { font-size: 12px; }
+.ic-verdict { grid-column: 4; max-width: 100%; font-size: 13px; padding: 4px 6px; }
+.ic-row > .ic-pass, .ic-row > .ic-auto, .ic-row > .delib-nudge { grid-column: 4; justify-self: start; }
+.ic-pass { border: 1px solid var(--line); background: var(--panel); border-radius: 8px; padding: 4px 9px; font: inherit; font-size: 13px; cursor: pointer; }
+.ic-pass.on { border-color: var(--good); background: var(--good-soft); font-weight: 600; }
+.ic-pass:disabled { cursor: default; opacity: 0.8; }
+.ic-auto { font-size: 12px; color: var(--muted); }
+.ic-auto.on { color: var(--good); font-weight: 600; }
+.ic-notes { display: grid; gap: 8px; margin-top: 8px; font-size: 14px; }
+.ic-notes .delib-item { white-space: pre-wrap; }

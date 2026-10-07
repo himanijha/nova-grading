@@ -58,6 +58,11 @@ export default function DeliberationsClient({ queue, people, ranking, isAdmin })
   const current = selectedId && people[selectedId] ? selectedId : members[0] || null;
   const person = current ? people[current] : null;
 
+  const passedOf = useMemo(
+    () => Object.fromEntries(order.map((r) => [r.applicantId, !!r.passed])),
+    [order]
+  );
+
   const doneIn = (g) => g.applicantIds.filter((id) => verdictOf[id]).length;
   const totalDone = allIds.filter((id) => verdictOf[id]).length;
 
@@ -96,6 +101,11 @@ export default function DeliberationsClient({ queue, people, ranking, isAdmin })
       const next = nextUnrated(current);
       if (next) select(next);
     }
+  }
+
+  async function setPassed(passed) {
+    if (!current || !isAdmin) return;
+    await act({ applicantId: current, passed });
   }
 
   async function moveTo(id, toIndex) {
@@ -211,9 +221,11 @@ export default function DeliberationsClient({ queue, people, ranking, isAdmin })
                 person={person}
                 group={group}
                 verdict={verdictOf[current] || null}
+                passed={!!passedOf[current]}
                 isAdmin={isAdmin}
                 busy={busy}
                 onVerdict={setVerdict}
+                onPass={setPassed}
               />
             ) : (
               <div className="empty">Nobody in this group.</div>
@@ -272,7 +284,10 @@ export default function DeliberationsClient({ queue, people, ranking, isAdmin })
                         {r.person.fullName}
                         {r.verdict === "COME_BACK" && <span className="delib-flag">come back</span>}
                       </button>
-                      <span className={`delib-verdict v-${slug(r.verdict)}`}>{v?.label}</span>
+                      <span className={`delib-verdict v-${slug(r.verdict)}`}>
+                        {v?.label}
+                        {r.passed && <span className="delib-passed">passed</span>}
+                      </span>
                       {isAdmin && (
                         <span className="delib-nudge">
                           <button
@@ -305,7 +320,7 @@ export default function DeliberationsClient({ queue, people, ranking, isAdmin })
   );
 }
 
-function Detail({ person, group, verdict, isAdmin, busy, onVerdict }) {
+function Detail({ person, group, verdict, passed, isAdmin, busy, onVerdict, onPass }) {
   const { year, transfer } = gradYearParts(person.gradYear);
   return (
     <div className="delib-detail">
@@ -345,6 +360,24 @@ function Detail({ person, group, verdict, isAdmin, busy, onVerdict }) {
             <span>{v.icon}</span> {v.label}
           </button>
         ))}
+      </div>
+
+      <div className="delib-pass">
+        {verdict === "MAYBE" ? (
+          <button
+            type="button"
+            className={`btn${passed ? " on" : ""}`}
+            disabled={!isAdmin || busy}
+            onClick={() => onPass(!passed)}
+            title={isAdmin ? "Maybes pass to the coffee chats only by hand" : "Only admins pass people"}
+          >
+            {passed ? "Passed to coffee chats · undo" : "Pass to coffee chats"}
+          </button>
+        ) : verdict === "STRONG_ACCEPT" || verdict === "YES" ? (
+          <span className="muted">Passed to the coffee chats automatically.</span>
+        ) : (
+          <span className="muted">Not passed to the coffee chats.</span>
+        )}
       </div>
 
       <h3>Coffee chat ratings</h3>

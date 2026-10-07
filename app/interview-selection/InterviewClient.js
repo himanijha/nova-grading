@@ -1,366 +1,383 @@
 "use client";
 
-import { Fragment, useMemo, useState } from "react";
-import Link from "next/link";
-import { RATINGS, ratingMeta } from "@/lib/ratings";
-import { compareGradYears, gradYearParts, GRAD_YEAR_OPTIONS } from "@/lib/mapping";
+import { useEffect, useMemo, useState } from "react";
+import { useRouter } from "next/navigation";
 import { Mugshot } from "../Mugshot";
 import InfoStar from "../InfoStar";
+import { COLUMNS, VERDICTS, reorderWithin } from "@/lib/deliberation";
+import { compareGradYears, gradYearParts } from "@/lib/mapping";
 
-const ROLE_LABEL = {
-  DEVELOPER: "Developer",
-  DESIGNER: "Designer",
-  BOTH: "Both",
-  OTHER: "Other",
-  UNKNOWN: "Not specified",
-};
-const ROLE_ORDER = ["DEVELOPER", "DESIGNER", "BOTH", "OTHER", "UNKNOWN"];
+const slug = (value) => value.toLowerCase().replace(/_/g, "-");
 
-// A rating score is an average of 0–3 points, so the cutoff lives on that
-// scale. The default is 2.00 — the room, on average, gave a thumbs up.
-const MAX_SCORE = 3;
-const DEFAULT_CUTOFF = 2;
-
-/** One year's cutoff slider, with the count it currently admits. */
-function YearCutoff({ year, cutoff, above, total, onChange }) {
-  const { year: yearLabel, transfer } = gradYearParts(year);
-  return (
-    <div className="yc-row">
-      <div className="yc-year">
-        {yearLabel}
-        {transfer && <span className="yc-tag">transfer</span>}
-      </div>
-      <div className="yc-slider">
-        <input
-          type="range"
-          min={0}
-          max={MAX_SCORE}
-          step={0.05}
-          value={cutoff}
-          aria-label={`Cutoff rating for ${year}`}
-          onChange={(e) => onChange(year, Number(e.target.value))}
-        />
-      </div>
-      <div className="yc-cut">{cutoff.toFixed(2)}</div>
-      <div className="yc-count">
-        <strong>{above}</strong> of {total}
-        <span className="yc-pct">
-          {total > 0 ? ` · ${Math.round((above / total) * 100)}%` : ""}
-        </span>
-      </div>
-    </div>
-  );
+async function save(body) {
+  const res = await fetch("/api/deliberations", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+  });
+  const data = await res.json().catch(() => ({}));
+  return res.ok
+    ? { ok: true, ranking: data.ranking }
+    : { ok: false, error: data.error || "Something went wrong." };
 }
 
-export default function InterviewClient({ applicants }) {
-  const [roleFilter, setRoleFilter] = useState("all");
-  const [yearFilter, setYearFilter] = useState("all");
-  const [minRatings, setMinRatings] = useState(1);
-  const [openNotes, setOpenNotes] = useState(null);
+/**
+ * Coffee chat candidates in three columns, each in deliberation order, with a
+ * grad year filter per column. The stats count only people passed to the
+ * coffee chats, and move as the ranking does. Admins set verdicts, pass
+ * maybes, and drag people within their column.
+ */
+export default function InterviewClient({ ranking, people, isAdmin }) {
+  const router = useRouter();
+  // Same shared state as Deliberations: changes land here at once and are
+  // saved behind, and fresh data from the server replaces them.
+  const [order, setOrder] = useState(ranking);
+  useEffect(() => setOrder(ranking), [ranking]);
 
-  // Every year anyone actually applied in, oldest first, transfers after their class.
-  const allYears = useMemo(() => {
-    const set = new Set(applicants.map((a) => a.gradYear));
-    return [...set].sort(compareGradYears);
-  }, [applicants]);
+  const [years, setYears] = useState({ devs: "all", designers: "all", others: "all" });
+  const [openId, setOpenId] = useState(null);
+  const [drag, setDrag] = useState(null); // { id, column }
+  const [dropAt, setDropAt] = useState(null); // { column, index }
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState("");
 
-  // The filter also offers years nobody has applied in yet, so an empty cohort
-  // reads as empty rather than missing.
-  const years = useMemo(() => {
-    const set = new Set([...GRAD_YEAR_OPTIONS, ...allYears]);
-    return [...set].sort(compareGradYears);
-  }, [allYears]);
-
-  // One cutoff per graduation year, exactly as on Rankings: each class is
-  // competing against itself, not against the seniors.
-  const [cutoffs, setCutoffs] = useState({});
-  const cutoffFor = (year) => cutoffs[year] ?? DEFAULT_CUTOFF;
-  const setCutoff = (year, value) => setCutoffs((c) => ({ ...c, [year]: value }));
-
-  const shown = applicants.filter(
-    (a) =>
-      a.ratingCount >= minRatings &&
-      (roleFilter === "all" || a.roleCategory === roleFilter) &&
-      (yearFilter === "all" || a.gradYear === yearFilter)
+  const rows = useMemo(
+    () =>
+      order
+        .map((r, i) => ({
+          ...people[r.applicantId],
+          id: r.applicantId,
+          place: i + 1,
+          verdict: r.verdict,
+          passed: !!r.passed,
+        }))
+        .filter((r) => r.fullName),
+    [order, people]
   );
 
-  const unrated = applicants.filter(
-    (a) =>
-      a.ratingCount === 0 &&
-      (roleFilter === "all" || a.roleCategory === roleFilter) &&
-      (yearFilter === "all" || a.gradYear === yearFilter)
-  ).length;
+  const inColumn = (key) => rows.filter((r) => r.column === key);
+  const shownIn = (key) =>
+    years[key] === "all" ? inColumn(key) : inColumn(key).filter((r) => r.gradYear === years[key]);
 
-  const isAbove = (a) => a.score !== null && a.score >= cutoffFor(a.gradYear);
-  const above = shown.filter(isAbove);
+  async function act(body) {
+    setErr("");
+    setBusy(true);
+    const r = await save(body);
+    setBusy(false);
+    if (r.ok) setOrder(r.ranking);
+    else setErr(r.error);
+    router.refresh();
+    return r.ok;
+  }
 
-  // Where each person sits inside their own class. `shown` arrives sorted by
-  // score, so counting as we walk it gives the rank directly.
-  const yearRank = useMemo(() => {
-    const seen = {};
-    const map = {};
-    for (const a of shown) {
-      seen[a.gradYear] = (seen[a.gradYear] || 0) + 1;
-      map[a.id] = seen[a.gradYear];
+  // Move `id` to position `toIndex` of the year-filtered column. Everyone
+  // outside that filter keeps their place in the whole ranking.
+  async function moveInColumn(column, id, toIndex) {
+    const shown = shownIn(column).map((r) => r.id);
+    const from = shown.indexOf(id);
+    if (from < 0 || toIndex === from || toIndex < 0 || toIndex >= shown.length) return;
+    const newShown = [...shown];
+    newShown.splice(from, 1);
+    newShown.splice(toIndex, 0, id);
+    const members = inColumn(column).map((r) => r.id);
+    const newMembers = reorderWithin(members, shown, newShown);
+    const newRanking = reorderWithin(
+      order.map((r) => r.applicantId),
+      members,
+      newMembers
+    );
+    const byId = Object.fromEntries(order.map((r) => [r.applicantId, r]));
+    setOrder(newRanking.map((x) => byId[x]));
+    await act({ order: newRanking });
+  }
+
+  function dropOn(column, index) {
+    if (drag && drag.column === column) {
+      const from = shownIn(column).findIndex((r) => r.id === drag.id);
+      moveInColumn(column, drag.id, from < index ? index - 1 : index);
     }
-    return map;
-  }, [shown]);
+    setDrag(null);
+    setDropAt(null);
+  }
 
-  const singleYear = yearFilter !== "all";
-  const visibleYears = singleYear ? [yearFilter] : allYears;
-
-  const yearStats = visibleYears.map((y) => {
-    const inYear = shown.filter((a) => a.gradYear === y);
-    return {
-      year: y,
-      total: inYear.length,
-      above: inYear.filter(isAbove).length,
-    };
-  });
-
-  // How the room currently leans, counting each person's strongest support.
-  const summary = RATINGS.map((r) => ({
-    ...r,
-    count: shown.filter((a) => a.tally.find((t) => t.value === r.value)?.count > 0).length,
-  }));
-
-  const pct = shown.length ? Math.round((above.length / shown.length) * 100) : 0;
+  const passedRows = rows.filter((r) => r.passed);
+  const yearsAll = [...new Set(rows.map((r) => r.gradYear))].sort(compareGradYears);
 
   return (
-    <div className="page wide">
-      <h1>Interview selection</h1>
+    <div className="page wide ic">
+      <h1>Interview candidates</h1>
       <p className="sub">
-        Ranked by the thumbs from Mugshots, not by application scores. Each
-        person&apos;s number is the average of their ratings — double thumbs up
-        is 3, thumbs up 2, maybe 1, thumbs down 0 — and each graduation year
-        carries its own cutoff.
+        Everyone with a verdict from Deliberations, in ranking order. Strong accepts and yeses pass to
+        the coffee chats automatically; maybes pass only when an admin passes them by hand.{" "}
+        {isAdmin ? "Admins can change verdicts, pass maybes and drag people within their column." : "Only admins change verdicts and passes."}
       </p>
 
-      <div className="toolbar">
-        <div className="row-inline">
-          <label htmlFor="yf">Graduation year</label>
-          <select id="yf" className="inp" value={yearFilter} onChange={(e) => setYearFilter(e.target.value)}>
-            <option value="all">All years</option>
-            {years.map((y) => (
-              <option key={y} value={y}>
-                {y}
-              </option>
-            ))}
-          </select>
+      {err && (
+        <div className="err" style={{ marginBottom: 12 }}>
+          {err}
         </div>
-        <div className="row-inline">
-          <label htmlFor="rf">Role</label>
-          <select id="rf" className="inp" value={roleFilter} onChange={(e) => setRoleFilter(e.target.value)}>
-            <option value="all">All roles</option>
-            {ROLE_ORDER.map((r) => (
-              <option key={r} value={r}>
-                {ROLE_LABEL[r]}
-              </option>
-            ))}
-          </select>
-        </div>
-        <div className="row-inline">
-          <label htmlFor="mr">At least</label>
-          <select id="mr" className="inp" value={minRatings} onChange={(e) => setMinRatings(Number(e.target.value))}>
-            {[1, 2, 3].map((n) => (
-              <option key={n} value={n}>
-                {n} {n === 1 ? "rating" : "ratings"}
-              </option>
-            ))}
-          </select>
-        </div>
-      </div>
+      )}
 
-      <section className="card">
-        <div className="cutoff-grid">
-          <div>
-            <div className="bd-title">
-              {singleYear ? `Above cutoff — ${yearFilter}` : "Above cutoff — all years"}
-            </div>
-            <div className="hero-num">{above.length}</div>
-            <div className="hero-sub">
-              of {shown.length} rated {shown.length === 1 ? "person" : "people"} ({pct}%)
-              clear the cutoff for their year.
-              {unrated > 0 && (
-                <>
-                  <br />
-                  {unrated} {unrated === 1 ? "person has" : "people have"} no rating yet.
-                </>
-              )}
-            </div>
+      <section className="card ic-stats">
+        <div className="ic-hero">
+          <div className="bd-title">Passed to the coffee chats</div>
+          <div className="hero-num">{passedRows.length}</div>
+          <div className="hero-sub">
+            of {rows.length} with a verdict · {rows.length - passedRows.length} not passed
           </div>
-          <div>
-            <div className="bd-title">Anyone who got…</div>
-            {summary.map((r) => (
-              <div className="bd-row" key={r.value}>
-                <span className="bd-label">
-                  {r.icon} {r.label}
-                </span>
+        </div>
+
+        <div>
+          <div className="bd-title">By column</div>
+          {COLUMNS.map((c) => {
+            const total = inColumn(c.key).length;
+            const passed = passedRows.filter((r) => r.column === c.key).length;
+            return (
+              <div className="bd-row" key={c.key}>
+                <span className="bd-label">{c.label}</span>
                 <span className="bd-track">
-                  <span
-                    className="bd-fill"
-                    style={{
-                      width: `${shown.length ? (r.count / shown.length) * 100 : 0}%`,
-                    }}
-                  />
+                  <span className="bd-fill" style={{ width: `${total ? (passed / total) * 100 : 0}%` }} />
                 </span>
                 <span className="bd-val">
-                  <strong>{r.count}</strong>
+                  <strong>{passed}</strong> / {total}
                 </span>
               </div>
-            ))}
-          </div>
+            );
+          })}
         </div>
 
-        <div className="yc-block">
-          <div className="bd-title">
-            {singleYear ? "Cutoff for this year" : "Cutoff per graduation year"}
-          </div>
-          <div className="yc-head">
-            <span />
-            <span />
-            <span className="yc-cut">Rating</span>
-            <span className="yc-count">Interviewing</span>
-          </div>
-          {yearStats.map((y) => (
-            <YearCutoff
-              key={y.year}
-              year={y.year}
-              cutoff={cutoffFor(y.year)}
-              above={y.above}
-              total={y.total}
-              onChange={setCutoff}
-            />
-          ))}
-          {yearStats.length === 0 && (
-            <div style={{ color: "var(--muted)", fontSize: 13 }}>
-              Nobody matches these filters yet.
+        <div>
+          <div className="bd-title">Passed by verdict</div>
+          {VERDICTS.filter((v) => v.value !== "COME_BACK" && v.value !== "STRONG_NO").map((v) => (
+            <div className="bd-row" key={v.value}>
+              <span className="bd-label">
+                {v.icon} {v.label}
+              </span>
+              <span className="bd-val">
+                <strong>{passedRows.filter((r) => r.verdict === v.value).length}</strong>
+              </span>
             </div>
-          )}
-          {!singleYear && (
-            <button
-              className="btn"
-              style={{ marginTop: 12, padding: "7px 12px" }}
-              onClick={() => setCutoffs({})}
-            >
-              Reset all to {DEFAULT_CUTOFF.toFixed(2)}
-            </button>
+          ))}
+        </div>
+
+        <div className="ic-years">
+          <div className="bd-title">Passed by graduation year</div>
+          {yearsAll.length === 0 ? (
+            <div className="muted">Nobody has a verdict yet.</div>
+          ) : (
+            <table className="tbl ic-year-table">
+              <thead>
+                <tr>
+                  <th>Year</th>
+                  {COLUMNS.map((c) => (
+                    <th key={c.key} className="num">
+                      {c.label}
+                    </th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {yearsAll.map((y) => (
+                  <tr key={y}>
+                    <td>{gradYearParts(y).label}</td>
+                    {COLUMNS.map((c) => (
+                      <td key={c.key} className="num">
+                        {passedRows.filter((r) => r.gradYear === y && r.column === c.key).length}
+                      </td>
+                    ))}
+                  </tr>
+                ))}
+              </tbody>
+            </table>
           )}
         </div>
       </section>
 
-      <section className="card">
-        <h3>
-          Ranked by rating ({shown.length})
-          {singleYear ? ` — class of ${yearFilter}` : ""}
-        </h3>
-        {shown.length === 0 ? (
+      {rows.length === 0 ? (
+        <section className="card">
           <div className="empty">
-            Nobody matches these filters yet. Give your thumbs on My group.
+            Nobody has a verdict yet. Give people verdicts on Deliberations and they&apos;ll show up here.
           </div>
-        ) : (
-          <table className="tbl rank-table">
-            <thead>
-              <tr>
-                <th className="num">#</th>
-                <th className="num">In year</th>
-                <th>Photo</th>
-                <th>Name</th>
-                <th>Role</th>
-                <th>Grad year</th>
-                <th className="num">Score</th>
-                <th className="num">Year cutoff</th>
-                <th>Ratings</th>
-                <th className="num">Raters</th>
-              </tr>
-            </thead>
-            <tbody>
-              {shown.map((a, i) => {
-                const ok = isAbove(a);
-                // In a single-year view the list is one clean cut, so mark the line.
-                const showCut = singleYear && !ok && (i === 0 || isAbove(shown[i - 1]));
-                return (
-                  <Fragment key={a.id}>
-                    {showCut && (
-                      <tr className="cut-line">
-                        <td colSpan={10}>Cutoff — {cutoffFor(yearFilter).toFixed(2)}</td>
-                      </tr>
-                    )}
-                    <tr className={ok ? "above" : "below"}>
-                      <td className="num">{i + 1}</td>
-                      <td className="num">
-                        {yearRank[a.id]} of {yearStats.find((y) => y.year === a.gradYear)?.total ?? "—"}
-                      </td>
-                      <td>
-                        <Mugshot applicant={a} size={52} />
-                      </td>
-                      <td className="rank-name">
-                        <Link href={`/grading?id=${a.id}`}>{a.fullName}</Link>
-                        {a.infoSession && <InfoStar size={16} />}
-                        <Link className="app-link" href={`/grading?id=${a.id}`}>
-                          application ↗
-                        </Link>
-                      </td>
-                      <td>{ROLE_LABEL[a.roleCategory]}</td>
-                      <td>{a.gradYear || "—"}</td>
-                      <td className="num">
-                        <strong>{a.score?.toFixed(2) ?? "—"}</strong>
-                      </td>
-                      <td className="num" style={{ color: "var(--muted)" }}>
-                        {cutoffFor(a.gradYear).toFixed(2)}
-                      </td>
-                      <td>
-                        <button
-                          type="button"
-                          className="tally"
-                          title="Show the notes"
-                          aria-expanded={openNotes === a.id}
-                          onClick={() => setOpenNotes(openNotes === a.id ? null : a.id)}
+        </section>
+      ) : (
+        <div className="ic-cols">
+          {COLUMNS.map((c) => {
+            const members = inColumn(c.key);
+            const shown = shownIn(c.key);
+            const yearOpts = [...new Set(members.map((r) => r.gradYear))].sort(compareGradYears);
+            return (
+              <section className="card ic-col" key={c.key}>
+                <div className="ic-col-head">
+                  <h3>
+                    {c.label} <span className="muted">({members.length})</span>
+                  </h3>
+                  <select
+                    className="inp"
+                    aria-label={`${c.label} graduation year`}
+                    value={years[c.key]}
+                    onChange={(e) => setYears({ ...years, [c.key]: e.target.value })}
+                  >
+                    <option value="all">All years</option>
+                    {yearOpts.map((y) => (
+                      <option key={y} value={y}>
+                        {gradYearParts(y).label}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                {shown.length === 0 ? (
+                  <div className="empty">Nobody here yet.</div>
+                ) : (
+                  <ol className="ic-list">
+                    {shown.map((r, i) => {
+                      const isMoving = drag?.id === r.id;
+                      const isDrop = dropAt?.column === c.key && dropAt.index === i && drag && !isMoving;
+                      return (
+                        <li
+                          key={r.id}
+                          className={`ic-item${isMoving ? " dragging" : ""}${isDrop ? " drop" : ""}`}
+                          onDragOver={(e) => {
+                            if (!isAdmin || !drag || drag.column !== c.key) return;
+                            e.preventDefault();
+                            if (!(dropAt?.column === c.key && dropAt.index === i)) setDropAt({ column: c.key, index: i });
+                          }}
+                          onDrop={(e) => {
+                            e.preventDefault();
+                            dropOn(c.key, i);
+                          }}
                         >
-                          {a.tally
-                            .filter((t) => t.count > 0)
-                            .map((t) => (
-                              <span key={t.value} className="tally-bit">
-                                {t.icon}
-                                {t.count > 1 && <em>×{t.count}</em>}
+                          <div className="ic-row">
+                            {isAdmin && (
+                              <span
+                                className="drag-handle"
+                                draggable
+                                title="Drag to move within this column"
+                                onDragStart={(e) => {
+                                  e.dataTransfer.effectAllowed = "move";
+                                  e.dataTransfer.setData("text/plain", r.id);
+                                  setDrag({ id: r.id, column: c.key });
+                                }}
+                                onDragEnd={() => {
+                                  setDrag(null);
+                                  setDropAt(null);
+                                }}
+                              >
+                                ⋮⋮
                               </span>
-                            ))}
-                        </button>
-                      </td>
-                      <td className="num">{a.ratingCount}</td>
-                    </tr>
-                    {openNotes === a.id && (
-                      <tr className="note-row">
-                        <td colSpan={10}>
-                          {a.ratings.map((r, n) => (
-                            <div className="note-line" key={n}>
-                              <span>{ratingMeta(r.value)?.icon}</span>
-                              <strong>{r.graderName}</strong>
-                              <span>{r.note || "No note."}</span>
+                            )}
+                            <span className="delib-place">{r.place}</span>
+                            <Mugshot applicant={r} size={32} zoom={false} />
+                            <div className="ic-who">
+                              <button
+                                type="button"
+                                className="delib-name"
+                                aria-expanded={openId === r.id}
+                                onClick={() => setOpenId(openId === r.id ? null : r.id)}
+                              >
+                                {r.fullName}
+                                {r.infoSession && <InfoStar size={14} />}
+                              </button>
+                              <span className="muted ic-year">{gradYearParts(r.gradYear).label}</span>
                             </div>
-                          ))}
-                          {a.eventNotes.length > 0 && (
-                            <div className="note-group">
-                              <div className="note-group-title">During the meet and greet</div>
-                              {a.eventNotes.map((n, k) => (
-                                <div className="note-line" key={k}>
-                                  <strong>{n.graderName}</strong>
-                                  {n.round != null && <span className="note-label">Round {n.round}</span>}
-                                  <span>{n.body}</span>
+
+                            {isAdmin ? (
+                              <select
+                                className="inp ic-verdict"
+                                aria-label={`Verdict for ${r.fullName}`}
+                                value={r.verdict}
+                                disabled={busy}
+                                onChange={(e) =>
+                                  act({ applicantId: r.id, verdict: e.target.value || null })
+                                }
+                              >
+                                {VERDICTS.map((v) => (
+                                  <option key={v.value} value={v.value}>
+                                    {v.icon} {v.label}
+                                  </option>
+                                ))}
+                                <option value="">Clear verdict</option>
+                              </select>
+                            ) : (
+                              <span className={`delib-verdict v-${slug(r.verdict)}`}>
+                                {VERDICTS.find((v) => v.value === r.verdict)?.label}
+                              </span>
+                            )}
+
+                            {r.verdict === "MAYBE" ? (
+                              <button
+                                type="button"
+                                className={`ic-pass${r.passed ? " on" : ""}`}
+                                disabled={!isAdmin || busy}
+                                onClick={() => act({ applicantId: r.id, passed: !r.passed })}
+                                title={isAdmin ? "Maybes pass only by hand" : "Only admins pass people"}
+                              >
+                                {r.passed ? "Passed" : "Pass to interview"}
+                              </button>
+                            ) : (
+                              <span className={`ic-auto${r.passed ? " on" : ""}`}>
+                                {r.passed ? "Passed" : "Not passed"}
+                              </span>
+                            )}
+
+                            {isAdmin && (
+                              <span className="delib-nudge">
+                                <button
+                                  type="button"
+                                  aria-label={`Move ${r.fullName} up`}
+                                  disabled={busy || i === 0}
+                                  onClick={() => moveInColumn(c.key, r.id, i - 1)}
+                                >
+                                  ▲
+                                </button>
+                                <button
+                                  type="button"
+                                  aria-label={`Move ${r.fullName} down`}
+                                  disabled={busy || i === shown.length - 1}
+                                  onClick={() => moveInColumn(c.key, r.id, i + 1)}
+                                >
+                                  ▼
+                                </button>
+                              </span>
+                            )}
+                          </div>
+
+                          {openId === r.id && (
+                            <div className="ic-notes">
+                              {r.ratings.map((x, k) => (
+                                <div className="delib-item" key={`r${k}`}>
+                                  <div className="delib-stamp">
+                                    <span>{x.icon}</span>
+                                    <strong>{x.graderName}</strong>
+                                    <span className="muted">{x.label}</span>
+                                  </div>
+                                  <div>{x.note || <span className="muted">No note.</span>}</div>
                                 </div>
                               ))}
+                              {r.eventNotes.map((n, k) => (
+                                <div className="delib-item" key={`n${k}`}>
+                                  <div className="delib-stamp">
+                                    <strong>{n.graderName}</strong>
+                                    {n.round != null && <span className="note-label">Round {n.round}</span>}
+                                  </div>
+                                  <div>{n.body}</div>
+                                </div>
+                              ))}
+                              {r.ratings.length === 0 && r.eventNotes.length === 0 && (
+                                <div className="muted">No ratings or notes yet.</div>
+                              )}
                             </div>
                           )}
-                        </td>
-                      </tr>
-                    )}
-                  </Fragment>
-                );
-              })}
-            </tbody>
-          </table>
-        )}
-      </section>
+                        </li>
+                      );
+                    })}
+                  </ol>
+                )}
+              </section>
+            );
+          })}
+        </div>
+      )}
     </div>
   );
 }
