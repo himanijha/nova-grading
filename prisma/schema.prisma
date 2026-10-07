@@ -346,6 +346,9 @@ model DeliberationVerdict {
   applicant   Applicant @relation(fields: [applicantId], references: [id], onDelete: Cascade)
   verdict     String    // STRONG_ACCEPT | YES | MAYBE | STRONG_NO | COME_BACK
   position    Int
+  // Moving on to the coffee chats. Strong accepts and yeses pass on their own;
+  // a maybe passes only when an admin passes it by hand.
+  passedToInterview Boolean @default(false)
   updatedById String?
   updatedBy   Grader?   @relation("VerdictEdits", fields: [updatedById], references: [id], onDelete: SetNull)
   updatedAt   DateTime  @updatedAt
