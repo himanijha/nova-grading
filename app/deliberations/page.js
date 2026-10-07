@@ -33,7 +33,7 @@ export default async function DeliberationsPage() {
     }),
     prisma.deliberationVerdict.findMany({
       orderBy: { position: "asc" },
-      select: { applicantId: true, verdict: true },
+      select: { applicantId: true, verdict: true, passedToInterview: true },
     }),
   ]);
 
@@ -115,7 +115,11 @@ export default async function DeliberationsPage() {
     ])
   );
 
-  const ranking = verdictRows.map((r) => ({ applicantId: r.applicantId, verdict: r.verdict }));
+  const ranking = verdictRows.map((r) => ({
+    applicantId: r.applicantId,
+    verdict: r.verdict,
+    passed: r.passedToInterview,
+  }));
 
   return (
     <>
