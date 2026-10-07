@@ -1,6 +1,12 @@
 const test = require("node:test");
 const assert = require("node:assert/strict");
-const { placeVerdict, isVerdict } = require("../lib/deliberation.js");
+const {
+  placeVerdict,
+  isVerdict,
+  columnFor,
+  passAfter,
+  reorderWithin,
+} = require("../lib/deliberation.js");
 
 test("a new verdict lands below everyone rated at least as high", () => {
   const verdicts = { a: "STRONG_ACCEPT", b: "YES", c: "MAYBE" };
@@ -26,4 +32,33 @@ test("isVerdict only accepts the five calls", () => {
   assert.equal(isVerdict("YES"), true);
   assert.equal(isVerdict("DOUBLE_UP"), false);
   assert.equal(isVerdict("constructor"), false);
+});
+
+test("roles map to the three columns", () => {
+  assert.equal(columnFor("DEVELOPER"), "devs");
+  assert.equal(columnFor("DESIGNER"), "designers");
+  assert.equal(columnFor("BOTH"), "others");
+  assert.equal(columnFor("OTHER"), "others");
+  assert.equal(columnFor("UNKNOWN"), "others");
+});
+
+test("strong accept and yes always pass", () => {
+  assert.equal(passAfter("STRONG_ACCEPT", false, null), true);
+  assert.equal(passAfter("YES", false, "MAYBE"), true);
+});
+
+test("a maybe passes only by hand and keeps it only while still a maybe", () => {
+  assert.equal(passAfter("MAYBE", false, "MAYBE"), false);
+  assert.equal(passAfter("MAYBE", true, "MAYBE"), true);
+  assert.equal(passAfter("MAYBE", true, "YES"), false);
+});
+
+test("strong no and come back are never passed", () => {
+  assert.equal(passAfter("STRONG_NO", true, "YES"), false);
+  assert.equal(passAfter("COME_BACK", true, "MAYBE"), false);
+});
+
+test("reordering a group keeps everyone else in their slots", () => {
+  const ranking = ["a", "x", "b", "y", "c"];
+  assert.deepEqual(reorderWithin(ranking, ["a", "b", "c"], ["c", "a", "b"]), ["c", "x", "a", "y", "b"]);
 });
