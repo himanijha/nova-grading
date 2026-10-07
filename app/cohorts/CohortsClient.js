@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { matchName, nameIndex } from "@/lib/signups";
 import { formatWhen } from "@/lib/when";
+import AddToSession from "../AddToSession";
 
 async function post(url, body) {
   const res = await fetch(url, {
@@ -43,6 +44,12 @@ export default function CohortsClient({ sheet, cohorts, signups, applicants }) {
           key={c.id}
           cohort={c}
           waiting={signups.filter((s) => s.cohortId === c.id).length}
+          others={applicants
+            .filter((a) => a.cohortId !== c.id)
+            .map((a) => ({
+              ...a,
+              sessionName: cohorts.find((x) => x.id === a.cohortId)?.name || null,
+            }))}
           onChange={refresh}
         />
       ))}
@@ -195,8 +202,18 @@ function Unmatched({ signups, cohorts, applicants, onChange }) {
 
 // --- one session -------------------------------------------------------------
 
-function Session({ cohort, waiting, onChange }) {
+function Session({ cohort, waiting, others, onChange }) {
   const [confirmDelete, setConfirmDelete] = useState(false);
+  const [q, setQ] = useState("");
+
+  async function takeBack(applicantId) {
+    await fetch("/api/cohorts/members", {
+      method: "DELETE",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ applicantId }),
+    });
+    onChange();
+  }
 
   async function remove() {
     await post("/api/cohorts", { action: "delete", cohortId: cohort.id });
@@ -240,6 +257,41 @@ function Session({ cohort, waiting, onChange }) {
           <p className="small" style={{ lineHeight: 1.7 }}>{cohort.members.join(" · ")}</p>
         </details>
       )}
+      <details className="answers" style={{ marginTop: 12 }}>
+        <summary>
+          Add someone by hand{cohort.byHand.length > 0 && ` · ${cohort.byHand.length} added`}
+        </summary>
+        <p className="card-sub">
+          For someone the sheet has wrong or doesn&apos;t have at all. They get a seat in every
+          planned round without anyone else moving, and reading the sheet again leaves them here.
+        </p>
+        {cohort.byHand.map((a) => (
+          <div key={a.id} className="small" style={{ marginBottom: 6 }}>
+            {a.fullName} · added by hand{" "}
+            <button type="button" className="btn sm" onClick={() => takeBack(a.id)}>
+              Remove
+            </button>
+          </div>
+        ))}
+        <input
+          className="inp"
+          type="search"
+          autoComplete="off"
+          placeholder="Search applications by name or email"
+          aria-label={`Add someone to ${cohort.name}`}
+          value={q}
+          onChange={(e) => setQ(e.target.value)}
+        />
+        <AddToSession
+          cohort={cohort}
+          others={others}
+          q={q}
+          onAdded={() => {
+            setQ("");
+            onChange();
+          }}
+        />
+      </details>
     </section>
   );
 }

@@ -135,6 +135,16 @@ to a new symbol between rounds. Graders stay at one symbol for the whole hour.
    with likely candidates suggested; pick the right application and they join
    their session. The choice is remembered. *Refresh from sheet* reads it
    again: people already in the right session keep their check-in and groups.
+
+   When the sheet has someone wrong, or doesn't have them at all, add them by
+   hand: *Add someone by hand* on a session here, or — for any grader at the
+   door — search their name on Mugshots and pick them from the applications
+   listed under the session's own results. Only someone who applied can be
+   added, and not someone marked not passed in Rankings. Someone already in
+   another session is moved. They take the smallest group in each planned
+   round and nobody else moves, so printed nametags stay right. Reading the
+   sheet again leaves anyone placed by hand where they are; an admin can
+   remove them from the session's *Add someone by hand* list.
 3. **Groups (admins plan, everyone views).** Set how many groups the room has
    and which graders sit at each symbol, then *Plan rounds*. Each round is mixed
    against the earlier ones, so people meet new people and new graders. Drag

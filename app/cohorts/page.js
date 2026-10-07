@@ -18,12 +18,18 @@ export default async function CohortsPage() {
     prisma.eventSheet.findUnique({ where: { id: "main" } }),
     prisma.cohortMember.findMany({
       orderBy: { applicant: { fullName: "asc" } },
-      select: { cohortId: true, applicant: { select: { id: true, fullName: true } } },
+      select: { cohortId: true, byHand: true, applicant: { select: { id: true, fullName: true } } },
     }),
     prisma.signup.findMany({ orderBy: { name: "asc" }, select: { id: true, name: true, cohortId: true } }),
     prisma.applicant.findMany({
       orderBy: { fullName: "asc" },
-      select: { id: true, fullName: true, uclaEmail: true, cohort: { select: { cohortId: true } } },
+      select: {
+        id: true,
+        fullName: true,
+        uclaEmail: true,
+        screeningStatus: true,
+        cohort: { select: { cohortId: true } },
+      },
     }),
   ]);
 
@@ -35,6 +41,7 @@ export default async function CohortsPage() {
         cohorts={cohorts.map((c) => ({
           ...c,
           members: members.filter((m) => m.cohortId === c.id).map((m) => m.applicant.fullName),
+          byHand: members.filter((m) => m.cohortId === c.id && m.byHand).map((m) => m.applicant),
         }))}
         signups={signups}
         applicants={applicants.map((a) => ({
@@ -42,6 +49,8 @@ export default async function CohortsPage() {
           fullName: a.fullName,
           uclaEmail: a.uclaEmail,
           inSession: !!a.cohort,
+          status: a.screeningStatus,
+          cohortId: a.cohort?.cohortId || null,
         }))}
       />
     </>

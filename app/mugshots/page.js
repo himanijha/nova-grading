@@ -17,8 +17,9 @@ export default async function MugshotsPage({ searchParams }) {
   const cohortId = cohorts.some((c) => c.id === asked) ? asked : defaultCohortId(cohorts);
 
   let people = [];
+  let others = [];
   if (cohortId) {
-    const [members, rounds] = await Promise.all([
+    const [members, rounds, outside] = await Promise.all([
       prisma.cohortMember.findMany({
         where: { cohortId },
         select: { checkedInAt: true, applicant: { select: APPLICANT_CARD } },
@@ -33,7 +34,26 @@ export default async function MugshotsPage({ searchParams }) {
           },
         },
       }),
+      // Everyone who applied but isn't in this session, for adding by hand.
+      prisma.applicant.findMany({
+        where: { OR: [{ cohort: { is: null } }, { cohort: { cohortId: { not: cohortId } } }] },
+        orderBy: { fullName: "asc" },
+        select: {
+          id: true,
+          fullName: true,
+          uclaEmail: true,
+          screeningStatus: true,
+          cohort: { select: { cohort: { select: { name: true } } } },
+        },
+      }),
     ]);
+    others = outside.map((a) => ({
+      id: a.id,
+      fullName: a.fullName,
+      uclaEmail: a.uclaEmail,
+      status: a.screeningStatus,
+      sessionName: a.cohort?.cohort.name || null,
+    }));
 
     // Each person's groups in round order, to read out at the door.
     const schedule = (id) =>
@@ -57,7 +77,7 @@ export default async function MugshotsPage({ searchParams }) {
   return (
     <>
       <Nav grader={grader} />
-      <MugshotsClient cohorts={cohorts} cohortId={cohortId} people={people} />
+      <MugshotsClient cohorts={cohorts} cohortId={cohortId} people={people} others={others} />
     </>
   );
 }

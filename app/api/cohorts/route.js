@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
-import { bad, gate } from "@/lib/event";
+import { bad, gate, seatLatecomer } from "@/lib/event";
 import { syncSheet } from "@/lib/sheet";
 import { normalizeName } from "@/lib/signups";
 
@@ -36,16 +36,18 @@ export async function POST(req) {
     }
 
     const name = normalizeName(signup.name);
-    await prisma.$transaction([
-      prisma.nameMatch.upsert({
+    await prisma.$transaction(async (tx) => {
+      await tx.nameMatch.upsert({
         where: { name },
         create: { name, applicantId: applicant.id },
         update: { applicantId: applicant.id },
-      }),
-      prisma.cohortMember.create({ data: { applicantId: applicant.id, cohortId: signup.cohortId } }),
-      prisma.applicant.update({ where: { id: applicant.id }, data: { screeningStatus: "PASSED" } }),
-      prisma.signup.delete({ where: { id: signup.id } }),
-    ]);
+      });
+      await tx.cohortMember.create({ data: { applicantId: applicant.id, cohortId: signup.cohortId } });
+      await tx.applicant.update({ where: { id: applicant.id }, data: { screeningStatus: "PASSED" } });
+      await tx.signup.delete({ where: { id: signup.id } });
+      // If the rounds are already planned, they get a seat without anyone moving.
+      await seatLatecomer(tx, signup.cohortId, applicant.id);
+    });
     return NextResponse.json({ ok: true });
   }
 

@@ -230,6 +230,9 @@ model CohortMember {
   cohortId    String
   cohort      Cohort    @relation(fields: [cohortId], references: [id], onDelete: Cascade)
   checkedInAt DateTime?
+  // Put here by a person rather than by the sheet. Reading the sheet leaves
+  // them where they are, whatever it says about them.
+  byHand      Boolean   @default(false)
   createdAt   DateTime  @default(now())
 
   @@index([cohortId])

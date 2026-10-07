@@ -1327,6 +1327,7 @@ input.inp.big { font-size: 17px; padding: 14px 16px; border-radius: 12px; backgr
 .mark { font-size: 11px; font-weight: 600; white-space: nowrap; border-radius: 999px; padding: 2px 8px; }
 .mark.need { background: #fef3c7; color: var(--warn); }
 .mark.ok { background: var(--good-soft); color: var(--good); }
+.add-to-session { display: flex; flex-direction: column; gap: 8px; margin-top: 14px; }
 
 .person .back {
   border: 0;

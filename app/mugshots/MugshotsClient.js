@@ -4,6 +4,7 @@ import { useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { uploadPhoto } from "@/lib/photo-client";
+import AddToSession from "../AddToSession";
 import GroupBadge from "../GroupBadge";
 import { Mugshot } from "../Mugshot";
 
@@ -17,7 +18,7 @@ const matches = (p, q) => {
  * The door. Built for one hand on a phone: search, tap the name, take the
  * photo, read them their groups, then on to the next person down the list.
  */
-export default function MugshotsClient({ cohorts, cohortId, people }) {
+export default function MugshotsClient({ cohorts, cohortId, people, others }) {
   const router = useRouter();
   const searchRef = useRef(null);
   const [q, setQ] = useState("");
@@ -148,6 +149,19 @@ export default function MugshotsClient({ cohorts, cohortId, people }) {
           </button>
         ))}
       </div>
+
+      {/* Someone at the door who isn't on the list: find their application and
+          add them, then go straight to their photo. */}
+      <AddToSession
+        cohort={cohorts.find((c) => c.id === cohortId)}
+        others={others}
+        q={q}
+        onAdded={(p) => {
+          setQ("");
+          setOpenId(p.id);
+          router.refresh();
+        }}
+      />
     </div>
   );
 }

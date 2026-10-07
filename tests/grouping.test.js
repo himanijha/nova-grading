@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { seededRandom, generateRound } from "../lib/grouping.js";
+import { seededRandom, generateRound, seatNewcomer } from "../lib/grouping.js";
 import { groupSymbol } from "../lib/symbols.js";
 
 const ids = (n, p = "a") => Array.from({ length: n }, (_, i) => `${p}${i}`);
@@ -75,4 +75,29 @@ test("neighbouring groups differ in both colour and shape", () => {
     assert.notEqual(a.color, b.color);
     assert.notEqual(a.shape, b.shape);
   }
+});
+
+// --- seating a late addition -------------------------------------------------
+
+test("a late addition takes the smallest group each round and moves nobody", () => {
+  const groups = ["g0", "g1", "g2"];
+  const rounds = [
+    new Map([["a", "g0"], ["b", "g0"], ["c", "g1"], ["d", "g1"], ["e", "g2"]]),
+    new Map([["a", "g1"], ["b", "g2"], ["c", "g0"], ["d", "g2"], ["e", "g1"]]),
+  ];
+  const before = rounds.map((r) => [...r]);
+  assert.deepEqual(seatNewcomer(groups, rounds), ["g2", "g0"]);
+  assert.deepEqual(rounds.map((r) => [...r]), before);
+});
+
+test("a late addition avoids a symbol they have sat at when sizes allow", () => {
+  const groups = ["g0", "g1", "g2"];
+  const even = () => new Map([["a", "g0"], ["b", "g1"], ["c", "g2"]]);
+  const seats = seatNewcomer(groups, [even(), even(), even()]);
+  assert.equal(new Set(seats).size, 3, `seats ${seats}`);
+});
+
+test("a late addition has nowhere to sit without groups or rounds", () => {
+  assert.deepEqual(seatNewcomer([], [new Map()]), []);
+  assert.deepEqual(seatNewcomer(["g0"], []), []);
 });
