@@ -15,7 +15,7 @@ const matches = (p, q) => {
 
 /**
  * The door. Built for one hand on a phone: search, tap the name, take the
- * photo, read them their groups, next.
+ * photo, read them their groups, then on to the next person down the list.
  */
 export default function MugshotsClient({ cohorts, cohortId, people }) {
   const router = useRouter();
@@ -28,7 +28,7 @@ export default function MugshotsClient({ cohorts, cohortId, people }) {
     return (
       <div className="page">
         <h1>Mugshots</h1>
-        <div className="card">No cohorts have been set up yet.</div>
+        <div className="card">No sessions yet. An admin reads them from the sign-up sheet.</div>
       </div>
     );
   }
@@ -45,15 +45,37 @@ export default function MugshotsClient({ cohorts, cohortId, people }) {
       (q.trim() || show === "all" || (show === "waiting" ? !p.checkedIn : p.checkedIn))
   );
 
-  function next() {
+  function backToList() {
     setOpenId(null);
     setQ("");
     // Straight back to typing the next name.
     setTimeout(() => searchRef.current?.focus(), 0);
   }
 
+  // Whoever follows them down the list you came from. The open person stays in
+  // the running even once they are marked arrived, so their place isn't lost.
+  const line = people.filter(
+    (p) => p.id === openId || show === "all" || (show === "waiting" ? !p.checkedIn : p.checkedIn)
+  );
+  const following = line[line.findIndex((p) => p.id === openId) + 1] || null;
+
   if (open) {
-    return <Person person={open} onBack={next} onChange={() => router.refresh()} />;
+    return (
+      <Person
+        key={open.id}
+        person={open}
+        onBack={backToList}
+        onNext={
+          following &&
+          (() => {
+            setQ("");
+            setOpenId(following.id);
+            window.scrollTo(0, 0);
+          })
+        }
+        onChange={() => router.refresh()}
+      />
+    );
   }
 
   return (
@@ -108,9 +130,9 @@ export default function MugshotsClient({ cohorts, cohortId, people }) {
       </div>
 
       <div className="checkin-list">
-        {people.length === 0 && <div className="empty">Nobody is in this cohort yet.</div>}
+        {people.length === 0 && <div className="empty">Nobody is in this session yet.</div>}
         {people.length > 0 && shown.length === 0 && (
-          <div className="empty">{q.trim() ? "No one in this cohort matches that." : "Nobody here."}</div>
+          <div className="empty">{q.trim() ? "No one in this session matches that." : "Nobody here."}</div>
         )}
         {shown.map((p) => (
           <button key={p.id} type="button" className="checkin-row" onClick={() => setOpenId(p.id)}>
@@ -130,7 +152,7 @@ export default function MugshotsClient({ cohorts, cohortId, people }) {
   );
 }
 
-function Person({ person, onBack, onChange }) {
+function Person({ person, onBack, onNext, onChange }) {
   const cameraRef = useRef(null);
   const libraryRef = useRef(null);
   const [busy, setBusy] = useState(false);
@@ -216,7 +238,7 @@ function Person({ person, onBack, onChange }) {
       <section className="card schedule">
         <h3>Their groups</h3>
         {person.schedule.length === 0 ? (
-          <div className="muted">Rounds haven&apos;t been planned for this cohort yet.</div>
+          <div className="muted">Rounds haven&apos;t been planned for this session yet.</div>
         ) : (
           person.schedule.map((s) => (
             <div className="schedule-row" key={s.round}>
@@ -227,8 +249,8 @@ function Person({ person, onBack, onChange }) {
         )}
       </section>
 
-      <button className="btn primary big wide" onClick={onBack}>
-        Next person
+      <button className="btn primary big wide" onClick={onNext || onBack}>
+        {onNext ? "Next person" : "Done — back to list"}
       </button>
     </div>
   );

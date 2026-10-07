@@ -65,8 +65,8 @@ model Applicant {
   raw           String   @default("{}")
   createdAt     DateTime @default(now())
 
-  // The outcome of the written round, saved from Rankings. Only PASSED people
-  // can be put in a cohort for the group work event.
+  // The outcome of the written round, saved from Rankings. Anyone matched from
+  // the meet and greet sign-up sheet is marked PASSED too.
   screeningStatus String @default("PENDING") // PENDING | PASSED | REJECTED
 
   // Set by dragging the applicant in Rankings: a stand-in for their average
@@ -79,6 +79,7 @@ model Applicant {
   resume        ApplicantResume?
   ratings       Rating[]
   cohort        CohortMember?
+  nameMatches   NameMatch[]
   placements    Placement[]
   notes         Note[]
   deliberation  DeliberationVerdict?
@@ -196,9 +197,10 @@ model Grade {
   @@index([applicantId])
 }
 
-// --- group work event --------------------------------------------------------
+// --- meet and greet ----------------------------------------------------------
 //
-// A cohort is one hour-long time slot of the group work event. Everyone in it
+// A cohort is one hour-long session of the meet and greet, read from one
+// column of the sign-up sheet. Everyone in it
 // is in the same room; each round splits the room into small symbol groups
 // ("Blue Star"), and people move to a new symbol between rounds.
 
@@ -206,11 +208,16 @@ model Cohort {
   id        String    @id @default(cuid())
   name      String
   startsAt  DateTime?
-  // Optional ceiling for the availability matcher. Null means no limit.
   capacity  Int?
+  // Where it is, from the sheet's header ("Boelter Hall - Room 5440").
+  location  String?
+  // Which column of the sign-up sheet this session is. The column, not the
+  // time, is what identifies it: a tentative time can still move.
+  sheetCol  Int?      @unique
   createdAt DateTime  @default(now())
 
   members   CohortMember[]
+  signups   Signup[]
   groups    Group[]
   rounds    Round[]
 }
@@ -226,6 +233,33 @@ model CohortMember {
   createdAt   DateTime  @default(now())
 
   @@index([cohortId])
+}
+
+// A name on the sign-up sheet that hasn't been tied to an application yet.
+// Matched names don't need a row: they are CohortMembers.
+model Signup {
+  id        String   @id @default(cuid())
+  cohortId  String
+  cohort    Cohort   @relation(fields: [cohortId], references: [id], onDelete: Cascade)
+  name      String
+  createdAt DateTime @default(now())
+
+  @@index([cohortId])
+}
+
+// A sheet name someone tied to an applicant by hand, kept so refreshing from
+// the sheet doesn't ask again. `name` is the normalised spelling.
+model NameMatch {
+  name        String    @id
+  applicantId String
+  applicant   Applicant @relation(fields: [applicantId], references: [id], onDelete: Cascade)
+}
+
+// The sign-up sheet the sessions are read from. One row, id "main".
+model EventSheet {
+  id       String   @id @default("main")
+  url      String
+  syncedAt DateTime @default(now())
 }
 
 // A symbol group. It belongs to the cohort, not to a round: the symbols are

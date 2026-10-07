@@ -56,8 +56,8 @@ export default async function MyGroupPage({ searchParams }) {
           select: {
             ...APPLICANT_CARD,
             cohort: { select: { checkedInAt: true } },
-            // Only your own notes here: this screen is for writing. Everyone's
-            // notes are read together on Rate.
+            // Only your own notes and thumbs here: this screen is for writing.
+            // Everyone's are read together on Interview candidates.
             notes: {
               where: { graderId: grader.id },
               orderBy: { createdAt: "asc" },
@@ -69,6 +69,7 @@ export default async function MyGroupPage({ searchParams }) {
                 group: { select: { color: true, shape: true } },
               },
             },
+            ratings: { where: { graderId: grader.id }, select: { value: true } },
           },
         },
       },
@@ -84,6 +85,7 @@ export default async function MyGroupPage({ searchParams }) {
           round: n.round?.number ?? null,
           group: n.group,
         })),
+        myRating: a.ratings[0]?.value || null,
       }))
       .sort((a, b) => a.fullName.localeCompare(b.fullName));
   }

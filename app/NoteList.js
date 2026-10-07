@@ -1,7 +1,6 @@
 "use client";
 
 import { useState } from "react";
-import { useRouter } from "next/navigation";
 import { GroupShape } from "./GroupBadge";
 import { symbolMeta } from "@/lib/symbols";
 
@@ -11,38 +10,32 @@ const time = (iso) =>
 /**
  * Event notes, each stamped with where it was written. Your own notes can be
  * edited or deleted; everyone else's are read-only. `mineOnly` drops the
- * author line when every note on screen is yours anyway.
+ * author line when every note on screen is yours anyway. The list only draws
+ * what it is given: the owner changes `notes` straight away and saves behind
+ * it, through `onEdit(id, body)` and `onDelete(id)`.
  */
-export default function NoteList({ notes, mineOnly = false }) {
+export default function NoteList({ notes, mineOnly = false, onEdit, onDelete }) {
   if (notes.length === 0) return null;
   return (
     <ul className="note-list">
       {notes.map((n) => (
-        <NoteItem key={n.id} note={n} showAuthor={!mineOnly} editable={mineOnly || n.mine} />
+        <NoteItem
+          key={n.key || n.id}
+          note={n}
+          showAuthor={!mineOnly}
+          editable={mineOnly || n.mine}
+          onEdit={onEdit}
+          onDelete={onDelete}
+        />
       ))}
     </ul>
   );
 }
 
-function NoteItem({ note, showAuthor, editable }) {
-  const router = useRouter();
+function NoteItem({ note, showAuthor, editable, onEdit, onDelete }) {
   const [editing, setEditing] = useState(false);
   const [text, setText] = useState(note.body);
   const [confirmDelete, setConfirmDelete] = useState(false);
-  const [busy, setBusy] = useState(false);
-
-  async function call(method, body) {
-    setBusy(true);
-    await fetch("/api/notes", {
-      method,
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(body),
-    });
-    setBusy(false);
-    setEditing(false);
-    setConfirmDelete(false);
-    router.refresh();
-  }
 
   return (
     <li className={`note-item${note.mine ? " mine" : ""}`}>
@@ -58,13 +51,21 @@ function NoteItem({ note, showAuthor, editable }) {
           <span className="note-where">General</span>
         )}
         <span>{time(note.at)}</span>
-        {editable && !editing && (
+        {/* A note still on its way to the server has no id to edit or delete by yet. */}
+        {note.pending && <span>Saving…</span>}
+        {editable && !editing && !note.pending && (
           <span className="note-tools">
-            <button type="button" onClick={() => setEditing(true)}>
+            <button
+              type="button"
+              onClick={() => {
+                setText(note.body);
+                setEditing(true);
+              }}
+            >
               Edit
             </button>
             {confirmDelete ? (
-              <button type="button" className="danger-link" disabled={busy} onClick={() => call("DELETE", { noteId: note.id })}>
+              <button type="button" className="danger-link" onClick={() => onDelete(note.id)}>
                 Really delete?
               </button>
             ) : (
@@ -91,8 +92,11 @@ function NoteItem({ note, showAuthor, editable }) {
             <button
               type="button"
               className="on"
-              disabled={busy || !text.trim()}
-              onClick={() => call("PATCH", { noteId: note.id, body: text })}
+              disabled={!text.trim()}
+              onClick={() => {
+                setEditing(false);
+                if (text.trim() !== note.body) onEdit(note.id, text.trim());
+              }}
             >
               Save
             </button>

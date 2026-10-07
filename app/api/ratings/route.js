@@ -10,7 +10,8 @@ export async function POST(req) {
   const { applicantId, value, note } = await req.json().catch(() => ({}));
   if (!applicantId) return NextResponse.json({ error: "Missing applicant." }, { status: 400 });
 
-  const cleanNote = typeof note === "string" ? note.trim() || null : null;
+  // Leaving the note out keeps whatever reason is already there.
+  const noteData = note === undefined ? {} : { note: typeof note === "string" ? note.trim() || null : null };
 
   // A null value clears your rating rather than recording an opinion.
   if (value === null) {
@@ -27,8 +28,8 @@ export async function POST(req) {
 
   const rating = await prisma.rating.upsert({
     where: { applicantId_graderId: { applicantId, graderId: grader.id } },
-    create: { applicantId, graderId: grader.id, value, note: cleanNote },
-    update: { value, note: cleanNote },
+    create: { applicantId, graderId: grader.id, value, ...noteData },
+    update: { value, ...noteData },
   });
 
   return NextResponse.json({ ok: true, ratingId: rating.id });

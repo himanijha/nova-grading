@@ -35,16 +35,14 @@ function navGroups(grader) {
     },
     {
       key: "event",
-      label: "Group work",
-      // In the order the event runs: plan it, then on the day check people in
-      // (with their photo), take notes in your group, rate at the end.
+      label: "Meet and greet",
+      // In the order the event runs: who is coming, then on the day check people in
+      // (with their photo), then take notes and give your thumbs in your group.
       items: [
-        { href: "/event", label: "Overview" },
-        grader?.isAdmin && { href: "/cohorts", label: "Cohorts" },
+        grader?.isAdmin && { href: "/cohorts", label: "Sessions" },
         { href: "/groups", label: "Groups" },
         { href: "/mugshots", label: "Mugshots" },
         { href: "/my-group", label: "My group" },
-        { href: "/rate", label: "Rate" },
       ].filter(Boolean),
     },
     {
@@ -60,11 +58,10 @@ function navGroups(grader) {
   ].filter((g) => !g.hidden);
 }
 
-// The three screens used standing up at the event, one thumb away on a phone.
+// The two screens used standing up at the event, one thumb away on a phone.
 const TABS = [
   { href: "/mugshots", label: "Mugshots", icon: "📷" },
   { href: "/my-group", label: "My group", icon: "👥" },
-  { href: "/rate", label: "Rate", icon: "👍" },
 ];
 
 export default function Nav({ grader }) {
@@ -106,7 +103,7 @@ export default function Nav({ grader }) {
     <nav className="nav" ref={navRef}>
       {/* Phones: brand, where you are, and a menu with every page. */}
       <div className="nav-mobile">
-        <Link href="/event" className="nav-brand">
+        <Link href="/" className="nav-brand">
           NOVA
         </Link>
         <span className="nav-here">{current?.label || (path === "/settings" ? "Settings" : "")}</span>
