@@ -50,6 +50,11 @@ function navGroups(grader) {
       label: "Coffee chats",
       items: [{ href: "/interview-selection", label: "Interview candidates" }],
     },
+    {
+      key: "deliberations",
+      label: "Deliberations",
+      items: [{ href: "/deliberations", label: "Deliberations" }],
+    },
   ].filter((g) => !g.hidden);
 }
 
