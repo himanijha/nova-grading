@@ -25,6 +25,7 @@ model Grader {
   notes        Note[]
   infoSessionEdits InfoSessionAttendee[] @relation("InfoSessionEdits")
   infoSessionAdds  InfoSessionAttendee[] @relation("InfoSessionAdds")
+  verdictEdits     DeliberationVerdict[] @relation("VerdictEdits")
 }
 
 model PasswordResetToken {
@@ -80,6 +81,7 @@ model Applicant {
   cohort        CohortMember?
   placements    Placement[]
   notes         Note[]
+  deliberation  DeliberationVerdict?
 
   @@index([roleCategory])
   @@index([screeningStatus])
@@ -331,4 +333,22 @@ model InfoSessionAttendee {
 
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
+}
+
+// --- deliberations -----------------------------------------------------------
+//
+// The shared verdict on someone after round 3 of the group work event, given
+// by admins in Deliberations. One per applicant, so the whole team sees the
+// same ranking. `position` is where they sit in that ranking, 0 at the top.
+model DeliberationVerdict {
+  id          String    @id @default(cuid())
+  applicantId String    @unique
+  applicant   Applicant @relation(fields: [applicantId], references: [id], onDelete: Cascade)
+  verdict     String    // STRONG_ACCEPT | YES | MAYBE | STRONG_NO | COME_BACK
+  position    Int
+  updatedById String?
+  updatedBy   Grader?   @relation("VerdictEdits", fields: [updatedById], references: [id], onDelete: SetNull)
+  updatedAt   DateTime  @updatedAt
+
+  @@index([position])
 }
