@@ -92,7 +92,7 @@ export default function InterviewsClient({ isAdmin }) {
             </thead>
             <tbody>
               {slots.map((slot) => (
-                <SlotRow key={slot.id} slot={slot} isAdmin={isAdmin} router={router} />
+                <SlotRow key={slot.id} slot={slot} router={router} />
               ))}
             </tbody>
           </table>
@@ -146,13 +146,9 @@ function SheetSettings({ sheetUrl, onChange }) {
   );
 }
 
-function SlotRow({ slot, isAdmin, router }) {
-  const clickable = slot.mine || isAdmin;
+function SlotRow({ slot, router }) {
   return (
-    <tr
-      className={clickable ? "clickable" : ""}
-      onClick={clickable ? () => router.push(`/interviews/${slot.id}`) : undefined}
-    >
+    <tr className="clickable" onClick={() => router.push(`/interviews/${slot.id}`)}>
       <td>
         {slot.startRaw}
         {slot.endRaw ? `–${slot.endRaw}` : ""}

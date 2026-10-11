@@ -16,7 +16,7 @@ async function resyncIfDue() {
   return { sheet: fresh, error: r.error || null };
 }
 
-async function view(graderId) {
+async function view() {
   const slots = await prisma.interviewSlot.findMany({
     // Open rooms don't need a row until someone's booked into them.
     where: { NOT: { status: { equals: "Open", mode: "insensitive" } } },
@@ -46,7 +46,6 @@ async function view(graderId) {
       interviewer2Id: s.interviewer2Id,
       interviewer2Raw: s.interviewer2Raw,
       interviewer2Name: s.interviewer2?.name || null,
-      mine: s.interviewer1Id === graderId || s.interviewer2Id === graderId,
     })),
   };
 }
@@ -57,7 +56,7 @@ export async function GET() {
 
   try {
     const { sheet, error: syncError } = await resyncIfDue();
-    const data = await view(grader.id);
+    const data = await view();
     return NextResponse.json({
       ok: true,
       sheetUrl: sheet?.url || null,
@@ -85,7 +84,7 @@ export async function POST(req) {
       if (!url) return bad("Paste the schedule sheet's link first.");
       const r = await syncInterviewSchedule(url);
       if (r.error) return bad(r.error);
-      return NextResponse.json({ ok: true, ...(await view(grader.id)) });
+      return NextResponse.json({ ok: true, ...(await view()) });
     }
 
     // { raw, graderId } — admin only: say which grader an interviewer's first
@@ -105,7 +104,7 @@ export async function POST(req) {
       });
       const sheet = await prisma.interviewSheet.findUnique({ where: { id: "main" } });
       if (sheet) await syncInterviewSchedule(sheet.url);
-      return NextResponse.json({ ok: true, ...(await view(grader.id)) });
+      return NextResponse.json({ ok: true, ...(await view()) });
     }
   } catch (e) {
     console.error("POST /api/interviews failed:", e);

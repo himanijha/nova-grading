@@ -8,9 +8,10 @@ import InterviewGuideClient from "./InterviewGuideClient";
 export const dynamic = "force-dynamic";
 
 /** The interview guide for one slot: the dev or design script, picked by its
- * Role(s) text, with a place to jot notes and record a verdict. Only that
- * slot's two interviewers, or an admin, get it — everyone else has no
- * interview of their own here to guide. */
+ * Role(s) text, with a place to jot notes and record a verdict. Any signed-in
+ * grader can open and fill one in — the two assigned interviewers are the
+ * ones who matter at the end, but there's no one else around to protect this
+ * from. */
 export default async function InterviewGuidePage({ params }) {
   const grader = await getCurrentGrader();
   if (!grader) redirect("/login");
@@ -28,9 +29,6 @@ export default async function InterviewGuidePage({ params }) {
   });
   if (!slot) redirect("/interviews");
 
-  const isInterviewer = slot.interviewer1Id === grader.id || slot.interviewer2Id === grader.id;
-  if (!isInterviewer && !grader.isAdmin) redirect("/interviews");
-
   const script = scriptFor(slot.roleRaw);
   const report = slot.report
     ? { track: slot.report.track, notes: JSON.parse(slot.report.notesJson || "{}") }
@@ -43,19 +41,15 @@ export default async function InterviewGuidePage({ params }) {
     verdict: s.verdict,
     generalNotes: s.generalNotes || "",
   }));
-  // Your own scorecard, to fill in — only if you're actually one of the two
-  // interviewers. Everyone else's (just the one other interviewer, in
-  // practice) stays out of sight until asked for, so filling yours in isn't
-  // influenced by seeing theirs first.
-  const mine = isInterviewer
-    ? cards.find((c) => c.graderId === grader.id) || {
-        graderId: grader.id,
-        graderName: grader.name,
-        rubric: {},
-        verdict: null,
-        generalNotes: "",
-      }
-    : null;
+  // Your own scorecard, to fill in. Everyone else's stays out of sight until
+  // asked for, so filling yours in isn't influenced by seeing theirs first.
+  const mine = cards.find((c) => c.graderId === grader.id) || {
+    graderId: grader.id,
+    graderName: grader.name,
+    rubric: {},
+    verdict: null,
+    generalNotes: "",
+  };
   const others = cards.filter((c) => c.graderId !== grader.id);
 
   return (

@@ -8,11 +8,12 @@ const VERDICT_VALUES = new Set(VERDICTS.map((v) => v.value));
 /**
  * Save your own scorecard for a slot: { slotId, rubric?, verdict?,
  * generalNotes? }. Always keyed by the signed-in grader — there is no way to
- * write anyone else's, which is the whole point: each interviewer's rubric
- * and verdict are their own independent read on the candidate, not a shared
- * document like the notes. Only that slot's two interviewers, or an admin,
- * may write one (an admin writes their own, same as anyone). A verdict needs
- * general notes to explain it.
+ * write anyone else's, which is the whole point: each person's rubric and
+ * verdict are their own independent read on the candidate, not a shared
+ * document like the notes. Any signed-in grader may write one; the two
+ * assigned interviewers are the ones who matter at the end, but there's no
+ * one else around who'd score a candidate they didn't interview. A verdict
+ * needs general notes to explain it.
  */
 export async function POST(req) {
   const { error, grader } = await gate();
@@ -24,13 +25,8 @@ export async function POST(req) {
     return bad("Unknown verdict.");
   }
 
-  const slot = await prisma.interviewSlot.findUnique({
-    where: { id: slotId },
-    select: { interviewer1Id: true, interviewer2Id: true },
-  });
+  const slot = await prisma.interviewSlot.findUnique({ where: { id: slotId }, select: { id: true } });
   if (!slot) return bad("That interview slot no longer exists.", 404);
-  const isInterviewer = slot.interviewer1Id === grader.id || slot.interviewer2Id === grader.id;
-  if (!isInterviewer && !grader.isAdmin) return bad("Only that interview's interviewers can score it.", 403);
 
   if (verdict) {
     const existing = await prisma.interviewScorecard.findUnique({
