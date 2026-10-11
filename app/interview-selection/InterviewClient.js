@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { Mugshot } from "../Mugshot";
 import InfoStar from "../InfoStar";
 import { COLUMNS, VERDICTS, reorderWithin } from "@/lib/deliberation";
@@ -29,6 +29,7 @@ async function save(body) {
  */
 export default function InterviewClient({ ranking, people, isAdmin }) {
   const router = useRouter();
+  const searchParams = useSearchParams();
   // Same shared state as Deliberations: changes land here at once and are
   // saved behind, and fresh data from the server replaces them.
   const [order, setOrder] = useState(ranking);
@@ -36,6 +37,21 @@ export default function InterviewClient({ ranking, people, isAdmin }) {
 
   const [years, setYears] = useState({ devs: "all", designers: "all", others: "all" });
   const [openId, setOpenId] = useState(null);
+
+  // Arriving from a link ("see them on the coffee chat page"): open their
+  // card and make sure their grad year filter isn't hiding them.
+  const focusId = searchParams.get("focus");
+  useEffect(() => {
+    if (!focusId || !people[focusId]) return;
+    setYears((y) => ({ ...y, [people[focusId].column]: "all" }));
+    setOpenId(focusId);
+  }, [focusId, people]);
+
+  // Scroll to them once the filter change above has let their card render.
+  useEffect(() => {
+    if (!focusId || openId !== focusId) return;
+    document.getElementById(`ic-${focusId}`)?.scrollIntoView({ behavior: "smooth", block: "center" });
+  }, [focusId, openId, years]);
   const [drag, setDrag] = useState(null); // { id, column }
   const [dropAt, setDropAt] = useState(null); // { column, index }
   const [busy, setBusy] = useState(false);
@@ -236,6 +252,7 @@ export default function InterviewClient({ ranking, people, isAdmin }) {
                       return (
                         <li
                           key={r.id}
+                          id={`ic-${r.id}`}
                           className={`ic-item${isMoving ? " dragging" : ""}${isDrop ? " drop" : ""}`}
                           onDragOver={(e) => {
                             if (!isAdmin || !drag || drag.column !== c.key) return;

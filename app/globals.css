@@ -324,6 +324,40 @@ table.tbl th, table.tbl td {
   font-size: 13px;
 }
 table.tbl th { color: var(--muted); font-weight: 600; font-size: 12px; text-transform: uppercase; letter-spacing: 0.05em; }
+table.tbl tr.clickable { cursor: pointer; }
+table.tbl tr.clickable:hover { background: var(--hover, rgba(0, 0, 0, 0.03)); }
+.interview-notes { padding: 10px 0; }
+
+.name-menu { position: relative; display: inline-block; }
+.name-menu-btn {
+  font: inherit;
+  color: inherit;
+  text-decoration: underline;
+  text-decoration-color: var(--line);
+  cursor: pointer;
+}
+.name-menu-popup {
+  position: absolute;
+  top: calc(100% + 6px);
+  left: 0;
+  z-index: 40;
+  min-width: 150px;
+  display: flex;
+  flex-direction: column;
+  padding: 6px;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  box-shadow: 0 10px 28px rgba(22, 18, 31, 0.18);
+}
+.name-menu-popup a {
+  color: var(--ink);
+  font-size: 13px;
+  padding: 7px 9px;
+  border-radius: 6px;
+  white-space: nowrap;
+}
+.name-menu-popup a:hover { background: var(--bg); }
 
 .map-row { display: grid; grid-template-columns: 200px 1fr; gap: 12px; align-items: center; margin-bottom: 10px; }
 .map-row .lbl { font-size: 13px; font-weight: 600; }

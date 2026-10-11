@@ -26,6 +26,10 @@ model Grader {
   infoSessionEdits InfoSessionAttendee[] @relation("InfoSessionEdits")
   infoSessionAdds  InfoSessionAttendee[] @relation("InfoSessionAdds")
   verdictEdits     DeliberationVerdict[] @relation("VerdictEdits")
+  interviewsAsFirst  InterviewSlot[] @relation("Interviewer1")
+  interviewsAsSecond InterviewSlot[] @relation("Interviewer2")
+  interviewNotes     InterviewNote[]
+  interviewerAliases InterviewerAlias[]
 }
 
 model PasswordResetToken {
@@ -83,6 +87,7 @@ model Applicant {
   placements    Placement[]
   notes         Note[]
   deliberation  DeliberationVerdict?
+  interviewSlots InterviewSlot[]
 
   @@index([roleCategory])
   @@index([screeningStatus])
@@ -391,4 +396,82 @@ model DeliberationVerdict {
   updatedAt   DateTime  @updatedAt
 
   @@index([position])
+}
+
+// --- interviews --------------------------------------------------------------
+//
+// The schedule is read from a live Google Sheet: one row per room-and-time
+// slot, filled in by hand as candidates and interviewers are assigned. Synced
+// on every read (see lib/interviews.js), not just by hand, so the portal
+// tracks the sheet without anyone having to remember to press a button.
+
+// The interview schedule sheet. One row, id "main", same shape as EventSheet.
+model InterviewSheet {
+  id       String   @id @default("main")
+  url      String
+  syncedAt DateTime @default(now())
+}
+
+// One room-and-time slot from the schedule. Identified by day, start time and
+// room — not by sheet row — so a slot keeps its notes even if rows above it
+// shift. `candidateRaw`/`interviewer1Raw`/`interviewer2Raw` are the sheet's
+// text; the matched ids are resolved on sync and left null when nothing
+// matches, so the raw name is always there to show or hand-match.
+model InterviewSlot {
+  id          String   @id @default(cuid())
+  day         String
+  startRaw    String
+  endRaw      String
+  room        String
+  status      String?
+  roleRaw     String?
+  // Parsed from day + startRaw so the schedule can sort chronologically —
+  // neither is sortable as plain text ("10:00 AM" < "9:00 AM" alphabetically).
+  sortKey     Int      @default(0)
+
+  candidateRaw   String?
+  candidateId    String?
+  candidate      Applicant? @relation(fields: [candidateId], references: [id], onDelete: SetNull)
+
+  interviewer1Raw String?
+  interviewer1Id  String?
+  interviewer1    Grader? @relation("Interviewer1", fields: [interviewer1Id], references: [id], onDelete: SetNull)
+
+  interviewer2Raw String?
+  interviewer2Id  String?
+  interviewer2    Grader? @relation("Interviewer2", fields: [interviewer2Id], references: [id], onDelete: SetNull)
+
+  checkRaw    String?
+  notes       InterviewNote[]
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@unique([day, startRaw, room])
+  @@index([candidateId])
+  @@index([interviewer1Id])
+  @@index([interviewer2Id])
+  @@index([sortKey])
+}
+
+// What an interviewer noticed, kept with the slot they wrote it in.
+model InterviewNote {
+  id        String   @id @default(cuid())
+  slotId    String
+  slot      InterviewSlot @relation(fields: [slotId], references: [id], onDelete: Cascade)
+  graderId  String
+  grader    Grader   @relation(fields: [graderId], references: [id], onDelete: Cascade)
+  body      String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([slotId])
+  @@index([graderId])
+}
+
+// A sheet first name ("Jay") tied by hand to a grader, for when more than one
+// grader shares it. Remembered so a later sync doesn't ask again.
+model InterviewerAlias {
+  name     String @id
+  graderId String
+  grader   Grader @relation(fields: [graderId], references: [id], onDelete: Cascade)
 }
