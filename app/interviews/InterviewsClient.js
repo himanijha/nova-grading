@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
-import NoteList from "../NoteList";
+import { useRouter } from "next/navigation";
 
 const POLL_MS = 25000;
 
@@ -19,14 +19,14 @@ async function call(url, method, body) {
 /**
  * The interview schedule, polled from the sheet every 25s so it live-updates
  * as rooms fill in, in chronological order. Everyone sees the whole day; a
- * row opens for notes for its own two interviewers, or for an admin on any
- * row. Candidates and interviewers are matched by first name automatically;
- * an unmatched name just shows as the sheet's raw text.
+ * row opens its interview guide for its own two interviewers, or for an
+ * admin on any row. Candidates and interviewers are matched by first name
+ * automatically; an unmatched name just shows as the sheet's raw text.
  */
 export default function InterviewsClient({ isAdmin }) {
+  const router = useRouter();
   const [data, setData] = useState(null);
   const [loadErr, setLoadErr] = useState("");
-  const [openId, setOpenId] = useState(null);
   const pollRef = useRef(null);
 
   async function load() {
@@ -92,14 +92,7 @@ export default function InterviewsClient({ isAdmin }) {
             </thead>
             <tbody>
               {slots.map((slot) => (
-                <SlotRow
-                  key={slot.id}
-                  slot={slot}
-                  isAdmin={isAdmin}
-                  open={openId === slot.id}
-                  onToggle={() => setOpenId((id) => (id === slot.id ? null : slot.id))}
-                  onChange={load}
-                />
+                <SlotRow key={slot.id} slot={slot} isAdmin={isAdmin} router={router} />
               ))}
             </tbody>
           </table>
@@ -153,38 +146,29 @@ function SheetSettings({ sheetUrl, onChange }) {
   );
 }
 
-function SlotRow({ slot, isAdmin, open, onToggle, onChange }) {
+function SlotRow({ slot, isAdmin, router }) {
   const clickable = slot.mine || isAdmin;
   return (
-    <>
-      <tr
-        className={clickable ? "clickable" : ""}
-        onClick={clickable ? onToggle : undefined}
-      >
-        <td>
-          {slot.startRaw}
-          {slot.endRaw ? `–${slot.endRaw}` : ""}
-        </td>
-        <td>{slot.room}</td>
-        <td>
-          <CandidateName id={slot.candidateId} name={slot.candidateName} raw={slot.candidateRaw} />
-        </td>
-        <td>
-          <Named name={slot.interviewer1Name} raw={slot.interviewer1Raw} />
-        </td>
-        <td>
-          <Named name={slot.interviewer2Name} raw={slot.interviewer2Raw} />
-        </td>
-        <td>{slot.roleRaw}</td>
-      </tr>
-      {open && (
-        <tr>
-          <td colSpan={6}>
-            <SlotNotes slot={slot} isAdmin={isAdmin} onChange={onChange} />
-          </td>
-        </tr>
-      )}
-    </>
+    <tr
+      className={clickable ? "clickable" : ""}
+      onClick={clickable ? () => router.push(`/interviews/${slot.id}`) : undefined}
+    >
+      <td>
+        {slot.startRaw}
+        {slot.endRaw ? `–${slot.endRaw}` : ""}
+      </td>
+      <td>{slot.room}</td>
+      <td>
+        <CandidateName id={slot.candidateId} name={slot.candidateName} raw={slot.candidateRaw} />
+      </td>
+      <td>
+        <Named name={slot.interviewer1Name} raw={slot.interviewer1Raw} />
+      </td>
+      <td>
+        <Named name={slot.interviewer2Name} raw={slot.interviewer2Raw} />
+      </td>
+      <td>{slot.roleRaw}</td>
+    </tr>
   );
 }
 
@@ -234,60 +218,3 @@ function CandidateName({ id, name, raw }) {
   );
 }
 
-function SlotNotes({ slot, isAdmin, onChange }) {
-  const [draft, setDraft] = useState("");
-  const [busy, setBusy] = useState(false);
-  const [err, setErr] = useState("");
-  const canWrite = slot.mine || isAdmin;
-
-  const notes = slot.notes.map((n) => ({ ...n, round: null, group: null }));
-
-  async function add() {
-    const body = draft.trim();
-    if (!body) return;
-    setBusy(true);
-    setErr("");
-    const r = await call("/api/interview-notes", "POST", { slotId: slot.id, body });
-    setBusy(false);
-    if (!r.ok) return setErr(r.error);
-    setDraft("");
-    onChange();
-  }
-
-  async function editNote(noteId, body) {
-    const r = await call("/api/interview-notes", "PATCH", { noteId, body });
-    if (!r.ok) setErr(r.error);
-    else onChange();
-  }
-
-  async function deleteNote(noteId) {
-    const r = await call("/api/interview-notes", "DELETE", { noteId });
-    if (!r.ok) setErr(r.error);
-    else onChange();
-  }
-
-  return (
-    <div className="interview-notes">
-      <NoteList notes={notes} onEdit={editNote} onDelete={deleteNote} />
-      {notes.length === 0 && <p className="muted small">No notes yet.</p>}
-      {canWrite ? (
-        <div className="note-compose">
-          <textarea
-            className="inp"
-            rows={2}
-            placeholder="Notes on this interview…"
-            value={draft}
-            onChange={(e) => setDraft(e.target.value)}
-          />
-          <button className="btn primary" disabled={busy || !draft.trim()} onClick={add}>
-            Add note
-          </button>
-        </div>
-      ) : (
-        <p className="muted small">Only {slot.interviewer1Name || "Interviewer 1"} and{" "}
-          {slot.interviewer2Name || "Interviewer 2"} can add notes here.</p>
-      )}
-      {err && <p className="warn-text">{err}</p>}
-    </div>
-  );
-}

@@ -25,10 +25,6 @@ async function view(graderId) {
       candidate: { select: { fullName: true } },
       interviewer1: { select: { name: true } },
       interviewer2: { select: { name: true } },
-      notes: {
-        orderBy: { createdAt: "asc" },
-        include: { grader: { select: { name: true } } },
-      },
     },
   });
 
@@ -51,14 +47,6 @@ async function view(graderId) {
       interviewer2Raw: s.interviewer2Raw,
       interviewer2Name: s.interviewer2?.name || null,
       mine: s.interviewer1Id === graderId || s.interviewer2Id === graderId,
-      notes: s.notes.map((n) => ({
-        id: n.id,
-        body: n.body,
-        graderId: n.graderId,
-        graderName: n.grader.name,
-        at: n.createdAt,
-        mine: n.graderId === graderId,
-      })),
     })),
   };
 }

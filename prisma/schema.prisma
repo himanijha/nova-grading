@@ -30,6 +30,7 @@ model Grader {
   interviewsAsSecond InterviewSlot[] @relation("Interviewer2")
   interviewNotes     InterviewNote[]
   interviewerAliases InterviewerAlias[]
+  interviewReportEdits InterviewReport[]
 }
 
 model PasswordResetToken {
@@ -443,6 +444,7 @@ model InterviewSlot {
 
   checkRaw    String?
   notes       InterviewNote[]
+  report      InterviewReport?
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
@@ -474,4 +476,21 @@ model InterviewerAlias {
   name     String @id
   graderId String
   grader   Grader @relation(fields: [graderId], references: [id], onDelete: Cascade)
+}
+
+// The interview guide filled in during the interview: one shared document per
+// slot (the two interviewers switch off asking/typing, so it's one doc, not
+// one each). `notesJson` is keyed by the script's question ids — a loose
+// shape, like Applicant.raw, since the script itself can change.
+model InterviewReport {
+  id           String        @id @default(cuid())
+  slotId       String        @unique
+  slot         InterviewSlot @relation(fields: [slotId], references: [id], onDelete: Cascade)
+  track        String? // NEW | EXPERIENCED
+  notesJson    String        @default("{}")
+  verdict      String? // STRONG_ACCEPT | SOFT_YES | NO
+  generalNotes String?
+  updatedById  String?
+  updatedBy    Grader?       @relation(fields: [updatedById], references: [id], onDelete: SetNull)
+  updatedAt    DateTime      @updatedAt
 }
