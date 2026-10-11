@@ -9,9 +9,8 @@ export const dynamic = "force-dynamic";
 
 /** The interview guide for one slot: the dev or design script, picked by its
  * Role(s) text, with a place to jot notes and record a verdict. Any signed-in
- * grader can open and fill one in — the two assigned interviewers are the
- * ones who matter at the end, but there's no one else around to protect this
- * from. */
+ * grader can open it, but only the two assigned interviewers get an editable
+ * scorecard — anyone else just sees everyone's scorecards read-only. */
 export default async function InterviewGuidePage({ params }) {
   const grader = await getCurrentGrader();
   if (!grader) redirect("/login");
@@ -41,16 +40,19 @@ export default async function InterviewGuidePage({ params }) {
     verdict: s.verdict,
     generalNotes: s.generalNotes || "",
   }));
-  // Your own scorecard, to fill in. Everyone else's is shown read-only, right
-  // alongside it.
-  const mine = cards.find((c) => c.graderId === grader.id) || {
-    graderId: grader.id,
-    graderName: grader.name,
-    rubric: {},
-    verdict: null,
-    generalNotes: "",
-  };
-  const others = cards.filter((c) => c.graderId !== grader.id);
+  // Your own scorecard, to fill in — only if you're one of the two assigned
+  // interviewers. Everyone else's is shown read-only, right alongside it.
+  const isAssigned = grader.id === slot.interviewer1Id || grader.id === slot.interviewer2Id;
+  const mine = isAssigned
+    ? cards.find((c) => c.graderId === grader.id) || {
+        graderId: grader.id,
+        graderName: grader.name,
+        rubric: {},
+        verdict: null,
+        generalNotes: "",
+      }
+    : null;
+  const others = cards.filter((c) => c.graderId !== grader.id || !isAssigned);
 
   return (
     <>

@@ -19,9 +19,9 @@ async function post(url, body) {
  * - The notes (and the candidate's track) are shared — both interviewers
  *   write to the same copy, since they're writing up the same conversation.
  * - The rubric and verdict are each interviewer's own independent read on
- *   the candidate ("mine"), kept apart from "theirs" so filling yours in
- *   isn't influenced by seeing the other's first. Theirs stays hidden behind
- *   a reveal unless you're an admin just looking, not scoring.
+ *   the candidate. Only an assigned interviewer gets an editable copy
+ *   ("mine"); everyone else's scorecard is shown read-only, labeled by name
+ *   ("others") — including both of theirs, for a grader who isn't assigned.
  */
 export default function InterviewGuideClient({ slot, script, report, mine, others }) {
   const [track, setTrack] = useState(report.track || "");
