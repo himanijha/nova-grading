@@ -324,6 +324,9 @@ table.tbl th, table.tbl td {
   font-size: 13px;
 }
 table.tbl th { color: var(--muted); font-weight: 600; font-size: 12px; text-transform: uppercase; letter-spacing: 0.05em; }
+table.tbl tr.clickable { cursor: pointer; }
+table.tbl tr.clickable:hover { background: var(--hover, rgba(0, 0, 0, 0.03)); }
+.interview-notes { padding: 10px 0; }
 
 .map-row { display: grid; grid-template-columns: 200px 1fr; gap: 12px; align-items: center; margin-bottom: 10px; }
 .map-row .lbl { font-size: 13px; font-weight: 600; }
