@@ -488,6 +488,7 @@ model InterviewReport {
   slot         InterviewSlot @relation(fields: [slotId], references: [id], onDelete: Cascade)
   track        String? // NEW | EXPERIENCED
   notesJson    String        @default("{}")
+  rubricJson   String        @default("{}") // category id -> 1-5
   verdict      String? // STRONG_ACCEPT | SOFT_YES | NO
   generalNotes String?
   updatedById  String?

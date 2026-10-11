@@ -25,6 +25,7 @@ async function savePatch(slotId, patch) {
 export default function InterviewGuideClient({ slot, script, report }) {
   const [track, setTrack] = useState(report.track || "");
   const [notes, setNotes] = useState(report.notes || {});
+  const [rubric, setRubric] = useState(report.rubric || {});
   const [verdict, setVerdict] = useState(report.verdict || "");
   const [generalNotes, setGeneralNotes] = useState(report.generalNotes || "");
   const [open, setOpen] = useState(() => new Set(script.sections.map((s) => s.key)));
@@ -54,6 +55,12 @@ export default function InterviewGuideClient({ slot, script, report }) {
     const next = { ...notes, [id]: value };
     setNotes(next);
     save({ notes: next });
+  }
+
+  function setScore(categoryId, n) {
+    const next = { ...rubric, [categoryId]: n };
+    setRubric(next);
+    save({ rubric: next });
   }
 
   function onGeneralNotesBlur(value) {
@@ -136,6 +143,8 @@ export default function InterviewGuideClient({ slot, script, report }) {
         </section>
       ))}
 
+      {script.rubric && <Rubric rubric={script.rubric} scores={rubric} onScore={setScore} />}
+
       <section className="card">
         <h3 style={{ marginTop: 0 }}>Verdict</h3>
         <div className="seg">
@@ -169,6 +178,51 @@ export default function InterviewGuideClient({ slot, script, report }) {
         )}
       </section>
     </div>
+  );
+}
+
+/** The scoring table: pick 1-5 per category (5/3/1 are described; 4/2 are
+ * the in-between scores the rubric says to use for answers that fall
+ * between them), and the total/average build up as scores go in. */
+function Rubric({ rubric, scores, onScore }) {
+  const filled = rubric.categories.filter((c) => scores[c.id]);
+  const total = filled.reduce((sum, c) => sum + scores[c.id], 0);
+  const max = rubric.categories.length * 5;
+
+  return (
+    <section className="card">
+      <h3 style={{ marginTop: 0 }}>{rubric.title}</h3>
+      <p className="card-sub">{rubric.intro}</p>
+      <div className="ig-rubric">
+        {rubric.categories.map((cat) => (
+          <div className="ig-rubric-row" key={cat.id}>
+            <div className="ig-rubric-label">
+              <strong>{cat.label}</strong>
+              <div className="ig-guidance">Draws from: {cat.drawsFrom}</div>
+            </div>
+            <div className="ig-rubric-scores">
+              {[1, 2, 3, 4, 5].map((n) => (
+                <button
+                  key={n}
+                  type="button"
+                  className={`ig-rubric-cell${scores[cat.id] === n ? " on" : ""}`}
+                  onClick={() => onScore(cat.id, n)}
+                >
+                  <span className="ig-rubric-n">{n}</span>
+                  {cat.anchors[n] && <span className="ig-rubric-text">{cat.anchors[n]}</span>}
+                </button>
+              ))}
+            </div>
+          </div>
+        ))}
+      </div>
+      <p className="ig-rubric-total">
+        {filled.length}/{rubric.categories.length} scored · Total <strong>{total}</strong>/{max}
+        {filled.length === rubric.categories.length && (
+          <> · Average <strong>{(total / filled.length).toFixed(1)}</strong></>
+        )}
+      </p>
+    </section>
   );
 }
 

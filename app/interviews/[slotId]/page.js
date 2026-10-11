@@ -35,10 +35,11 @@ export default async function InterviewGuidePage({ params }) {
     ? {
         track: slot.report.track,
         notes: JSON.parse(slot.report.notesJson || "{}"),
+        rubric: JSON.parse(slot.report.rubricJson || "{}"),
         verdict: slot.report.verdict,
         generalNotes: slot.report.generalNotes || "",
       }
-    : { track: null, notes: {}, verdict: null, generalNotes: "" };
+    : { track: null, notes: {}, rubric: {}, verdict: null, generalNotes: "" };
 
   return (
     <>

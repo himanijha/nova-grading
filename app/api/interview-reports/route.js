@@ -6,18 +6,19 @@ import { VERDICTS } from "@/lib/interviewScripts";
 const VERDICT_VALUES = new Set(VERDICTS.map((v) => v.value));
 
 /**
- * Save part of an interview's guide: { slotId, track?, notes?, verdict?,
- * generalNotes? }. `notes` is the whole question-id → text map, sent fresh
- * each save rather than merged server-side, since the client already holds
- * the current state. Only that slot's two interviewers, or an admin, may
- * write — same as interview notes. A verdict needs general notes to explain
- * it, checked against whichever of this save or the existing row has them.
+ * Save part of an interview's guide: { slotId, track?, notes?, rubric?,
+ * verdict?, generalNotes? }. `notes` and `rubric` are each sent as the whole
+ * map (question id → text, category id → 1-5) rather than merged
+ * server-side, since the client already holds the current state. Only that
+ * slot's two interviewers, or an admin, may write — same as interview notes.
+ * A verdict needs general notes to explain it, checked against whichever of
+ * this save or the existing row has them.
  */
 export async function POST(req) {
   const { error, grader } = await gate();
   if (error) return error;
 
-  const { slotId, track, notes, verdict, generalNotes } = await req.json().catch(() => ({}));
+  const { slotId, track, notes, rubric, verdict, generalNotes } = await req.json().catch(() => ({}));
   if (!slotId) return bad("Missing interview slot.");
   if (verdict !== undefined && verdict !== null && !VERDICT_VALUES.has(verdict)) {
     return bad("Unknown verdict.");
@@ -41,6 +42,7 @@ export async function POST(req) {
   const data = {
     ...(track !== undefined && { track: track || null }),
     ...(notes !== undefined && { notesJson: JSON.stringify(notes || {}) }),
+    ...(rubric !== undefined && { rubricJson: JSON.stringify(rubric || {}) }),
     ...(verdict !== undefined && { verdict: verdict || null }),
     ...(generalNotes !== undefined && { generalNotes: generalNotes || null }),
     updatedById: grader.id,

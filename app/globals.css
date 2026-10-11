@@ -1666,3 +1666,28 @@ input.inp.big { font-size: 17px; padding: 14px 16px; border-radius: 12px; backgr
 .ig-prompt { font-weight: 600; margin-bottom: 6px; }
 .ig-guidance { font-size: 13px; color: var(--muted); margin-bottom: 4px; }
 .ig-item textarea { margin-top: 8px; }
+
+.ig-rubric { display: grid; gap: 16px; margin-top: 12px; }
+.ig-rubric-row { display: grid; gap: 8px; }
+.ig-rubric-label { font-size: 14px; }
+.ig-rubric-scores { display: grid; grid-template-columns: repeat(5, 1fr); gap: 6px; }
+.ig-rubric-cell {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  text-align: left;
+  padding: 8px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--panel);
+  font: inherit;
+  cursor: pointer;
+  min-height: 48px;
+}
+.ig-rubric-cell.on { border-color: var(--accent); background: color-mix(in srgb, var(--accent) 12%, var(--panel)); }
+.ig-rubric-n { font-weight: 700; }
+.ig-rubric-text { font-size: 12px; color: var(--muted); }
+.ig-rubric-total { margin-top: 14px; font-size: 14px; }
+@media (max-width: 720px) {
+  .ig-rubric-scores { grid-template-columns: 1fr; }
+}
