@@ -67,15 +67,20 @@ export async function GET() {
   const { error, grader } = await gate();
   if (error) return error;
 
-  const { sheet, error: syncError } = await resyncIfDue();
-  const data = await view(grader.id);
-  return NextResponse.json({
-    ok: true,
-    sheetUrl: sheet?.url || null,
-    syncedAt: sheet?.syncedAt || null,
-    syncError,
-    ...data,
-  });
+  try {
+    const { sheet, error: syncError } = await resyncIfDue();
+    const data = await view(grader.id);
+    return NextResponse.json({
+      ok: true,
+      sheetUrl: sheet?.url || null,
+      syncedAt: sheet?.syncedAt || null,
+      syncError,
+      ...data,
+    });
+  } catch (e) {
+    console.error("GET /api/interviews failed:", e);
+    return bad(`Couldn't load the schedule: ${e.message}`, 500);
+  }
 }
 
 export async function POST(req) {
@@ -84,34 +89,39 @@ export async function POST(req) {
 
   const body = await req.json().catch(() => ({}));
 
-  // { url } — admin only: point the schedule at this sheet and read it now.
-  if (body.action === "setUrl") {
-    if (!grader.isAdmin) return bad("Admins only.", 403);
-    const url = String(body.url ?? "").trim();
-    if (!url) return bad("Paste the schedule sheet's link first.");
-    const r = await syncInterviewSchedule(url);
-    if (r.error) return bad(r.error);
-    return NextResponse.json({ ok: true, ...(await view(grader.id)) });
-  }
+  try {
+    // { url } — admin only: point the schedule at this sheet and read it now.
+    if (body.action === "setUrl") {
+      if (!grader.isAdmin) return bad("Admins only.", 403);
+      const url = String(body.url ?? "").trim();
+      if (!url) return bad("Paste the schedule sheet's link first.");
+      const r = await syncInterviewSchedule(url);
+      if (r.error) return bad(r.error);
+      return NextResponse.json({ ok: true, ...(await view(grader.id)) });
+    }
 
-  // { raw, graderId } — admin only: say which grader an interviewer's first
-  // name means, for when two graders share it.
-  if (body.action === "matchInterviewer") {
-    if (!grader.isAdmin) return bad("Admins only.", 403);
-    const raw = String(body.raw ?? "").trim();
-    const graderId = String(body.graderId ?? "");
-    if (!raw || !graderId) return bad("Missing name or grader.");
-    const target = await prisma.grader.findUnique({ where: { id: graderId }, select: { id: true } });
-    if (!target) return bad("That grader no longer exists.", 404);
-    const name = firstNameKey(raw);
-    await prisma.interviewerAlias.upsert({
-      where: { name },
-      create: { name, graderId },
-      update: { graderId },
-    });
-    const sheet = await prisma.interviewSheet.findUnique({ where: { id: "main" } });
-    if (sheet) await syncInterviewSchedule(sheet.url);
-    return NextResponse.json({ ok: true, ...(await view(grader.id)) });
+    // { raw, graderId } — admin only: say which grader an interviewer's first
+    // name means, for when two graders share it.
+    if (body.action === "matchInterviewer") {
+      if (!grader.isAdmin) return bad("Admins only.", 403);
+      const raw = String(body.raw ?? "").trim();
+      const graderId = String(body.graderId ?? "");
+      if (!raw || !graderId) return bad("Missing name or grader.");
+      const target = await prisma.grader.findUnique({ where: { id: graderId }, select: { id: true } });
+      if (!target) return bad("That grader no longer exists.", 404);
+      const name = firstNameKey(raw);
+      await prisma.interviewerAlias.upsert({
+        where: { name },
+        create: { name, graderId },
+        update: { graderId },
+      });
+      const sheet = await prisma.interviewSheet.findUnique({ where: { id: "main" } });
+      if (sheet) await syncInterviewSchedule(sheet.url);
+      return NextResponse.json({ ok: true, ...(await view(grader.id)) });
+    }
+  } catch (e) {
+    console.error("POST /api/interviews failed:", e);
+    return bad(`Something went wrong: ${e.message}`, 500);
   }
 
   return bad("Unknown action.");
