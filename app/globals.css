@@ -1685,6 +1685,7 @@ input.inp.big { font-size: 17px; padding: 14px 16px; border-radius: 12px; backgr
   min-height: 48px;
 }
 .ig-rubric-cell.on { border-color: var(--accent); background: color-mix(in srgb, var(--accent) 12%, var(--panel)); }
+.ig-rubric-cell:disabled { cursor: default; opacity: 0.85; }
 .ig-rubric-n { font-weight: 700; }
 .ig-rubric-text { font-size: 12px; color: var(--muted); }
 .ig-rubric-total { margin-top: 14px; font-size: 14px; }

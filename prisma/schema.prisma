@@ -31,6 +31,7 @@ model Grader {
   interviewNotes     InterviewNote[]
   interviewerAliases InterviewerAlias[]
   interviewReportEdits InterviewReport[]
+  interviewScorecards InterviewScorecard[]
 }
 
 model PasswordResetToken {
@@ -445,6 +446,7 @@ model InterviewSlot {
   checkRaw    String?
   notes       InterviewNote[]
   report      InterviewReport?
+  scorecards  InterviewScorecard[]
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
@@ -478,20 +480,37 @@ model InterviewerAlias {
   grader   Grader @relation(fields: [graderId], references: [id], onDelete: Cascade)
 }
 
-// The interview guide filled in during the interview: one shared document per
-// slot (the two interviewers switch off asking/typing, so it's one doc, not
-// one each). `notesJson` is keyed by the script's question ids — a loose
-// shape, like Applicant.raw, since the script itself can change.
+// The interview guide's shared parts: one document per slot, since the two
+// interviewers switch off asking/typing and are writing up the same
+// conversation. `notesJson` is keyed by the script's question ids — a loose
+// shape, like Applicant.raw, since the script itself can change. The rubric
+// and verdict are NOT here — those are each interviewer's own independent
+// read on the candidate, kept on InterviewScorecard instead.
 model InterviewReport {
+  id          String        @id @default(cuid())
+  slotId      String        @unique
+  slot        InterviewSlot @relation(fields: [slotId], references: [id], onDelete: Cascade)
+  track       String? // NEW | EXPERIENCED
+  notesJson   String        @default("{}")
+  updatedById String?
+  updatedBy   Grader?       @relation(fields: [updatedById], references: [id], onDelete: SetNull)
+  updatedAt   DateTime      @updatedAt
+}
+
+// One interviewer's own rubric scores, verdict and explanation for a slot —
+// deliberately not shared, so one interviewer never sees or influences the
+// other's score while scoring. The guide reveals the other's scorecard only
+// once you ask to see it.
+model InterviewScorecard {
   id           String        @id @default(cuid())
-  slotId       String        @unique
+  slotId       String
   slot         InterviewSlot @relation(fields: [slotId], references: [id], onDelete: Cascade)
-  track        String? // NEW | EXPERIENCED
-  notesJson    String        @default("{}")
+  graderId     String
+  grader       Grader        @relation(fields: [graderId], references: [id], onDelete: Cascade)
   rubricJson   String        @default("{}") // category id -> 1-5
   verdict      String? // STRONG_ACCEPT | SOFT_YES | NO
   generalNotes String?
-  updatedById  String?
-  updatedBy    Grader?       @relation(fields: [updatedById], references: [id], onDelete: SetNull)
   updatedAt    DateTime      @updatedAt
+
+  @@unique([slotId, graderId])
 }

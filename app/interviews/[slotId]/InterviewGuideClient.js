@@ -4,37 +4,35 @@ import { useState } from "react";
 import Link from "next/link";
 import { TRACKS, VERDICTS } from "@/lib/interviewScripts";
 
-async function savePatch(slotId, patch) {
-  const res = await fetch("/api/interview-reports", {
+async function post(url, body) {
+  const res = await fetch(url, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ slotId, ...patch }),
+    body: JSON.stringify(body),
   });
   const data = await res.json().catch(() => ({}));
   return res.ok ? { ok: true } : { ok: false, error: data.error || "Couldn't save." };
 }
 
 /**
- * The interview guide for one slot: the script's sections as collapsible
- * blocks, a track picker that reveals the matching newer/experienced
- * questions, a note box under each question, and a verdict at the bottom
- * that needs general notes to explain it. Every field autosaves (on blur for
- * text, immediately for the track and verdict) rather than needing a save
- * button, since this is filled in live during the interview.
+ * The interview guide for one slot. Two different things live on it:
+ * - The notes (and the candidate's track) are shared — both interviewers
+ *   write to the same copy, since they're writing up the same conversation.
+ * - The rubric and verdict are each interviewer's own independent read on
+ *   the candidate ("mine"), kept apart from "theirs" so filling yours in
+ *   isn't influenced by seeing the other's first. Theirs stays hidden behind
+ *   a reveal unless you're an admin just looking, not scoring.
  */
-export default function InterviewGuideClient({ slot, script, report }) {
+export default function InterviewGuideClient({ slot, script, report, mine, others }) {
   const [track, setTrack] = useState(report.track || "");
   const [notes, setNotes] = useState(report.notes || {});
-  const [rubric, setRubric] = useState(report.rubric || {});
-  const [verdict, setVerdict] = useState(report.verdict || "");
-  const [generalNotes, setGeneralNotes] = useState(report.generalNotes || "");
   const [open, setOpen] = useState(() => new Set(script.sections.map((s) => s.key)));
-  const [status, setStatus] = useState(""); // "", "saving", "saved", error message
+  const [reportStatus, setReportStatus] = useState("");
 
-  async function save(patch) {
-    setStatus("saving");
-    const r = await savePatch(slot.id, patch);
-    setStatus(r.ok ? "saved" : r.error);
+  async function saveReport(patch) {
+    setReportStatus("saving");
+    const r = await post("/api/interview-reports", { slotId: slot.id, ...patch });
+    setReportStatus(r.ok ? "saved" : r.error);
   }
 
   function toggleSection(key) {
@@ -47,35 +45,14 @@ export default function InterviewGuideClient({ slot, script, report }) {
 
   function onTrackChange(value) {
     setTrack(value);
-    save({ track: value });
+    saveReport({ track: value });
   }
 
   function onNoteBlur(id, value) {
     if (notes[id] === value) return;
     const next = { ...notes, [id]: value };
     setNotes(next);
-    save({ notes: next });
-  }
-
-  function setScore(categoryId, n) {
-    const next = { ...rubric, [categoryId]: n };
-    setRubric(next);
-    save({ rubric: next });
-  }
-
-  function onGeneralNotesBlur(value) {
-    if (generalNotes === value) return;
-    setGeneralNotes(value);
-    save({ generalNotes: value });
-  }
-
-  async function pickVerdict(value) {
-    if (!generalNotes.trim()) {
-      setStatus("Add general notes explaining the verdict first.");
-      return;
-    }
-    setVerdict(value);
-    await save({ verdict: value, generalNotes });
+    saveReport({ notes: next });
   }
 
   return (
@@ -103,6 +80,7 @@ export default function InterviewGuideClient({ slot, script, report }) {
       <section className="card">
         <h2 style={{ marginTop: 0 }}>{script.title}</h2>
         <p className="card-sub">{script.subtitle}</p>
+        <p className="muted small">Shared between both of you — either can edit.</p>
         <div className="map-row">
           <span className="lbl">Candidate track</span>
           <select className="inp" value={track} onChange={(e) => onTrackChange(e.target.value)}>
@@ -143,10 +121,69 @@ export default function InterviewGuideClient({ slot, script, report }) {
         </section>
       ))}
 
-      {script.rubric && <Rubric rubric={script.rubric} scores={rubric} onScore={setScore} />}
+      {reportStatus && (
+        <p className={reportStatus === "saving" || reportStatus === "saved" ? "muted small" : "warn-text"}>
+          {reportStatus === "saving" ? "Saving…" : reportStatus === "saved" ? "Saved." : reportStatus}
+        </p>
+      )}
+
+      {mine && <Scorecard key={mine.graderId} slotId={slot.id} rubric={script.rubric} card={mine} />}
+
+      {others.length > 0 && <TheirScorecards others={others} rubric={script.rubric} blind={!!mine} />}
+    </div>
+  );
+}
+
+/** Your own rubric, verdict and explanation — the only one you can edit. */
+function Scorecard({ slotId, rubric, card }) {
+  const [scores, setScores] = useState(card.rubric || {});
+  const [verdict, setVerdict] = useState(card.verdict || "");
+  const [generalNotes, setGeneralNotes] = useState(card.generalNotes || "");
+  const [status, setStatus] = useState("");
+
+  async function save(patch) {
+    setStatus("saving");
+    const r = await post("/api/interview-scorecards", { slotId, ...patch });
+    setStatus(r.ok ? "saved" : r.error);
+  }
+
+  function setScore(categoryId, n) {
+    const next = { ...scores, [categoryId]: n };
+    setScores(next);
+    save({ rubric: next });
+  }
+
+  function onGeneralNotesBlur(value) {
+    if (generalNotes === value) return;
+    setGeneralNotes(value);
+    save({ generalNotes: value });
+  }
+
+  async function pickVerdict(value) {
+    if (!generalNotes.trim()) {
+      setStatus("Add general notes explaining the verdict first.");
+      return;
+    }
+    setVerdict(value);
+    await save({ verdict: value, generalNotes });
+  }
+
+  return (
+    <>
+      {rubric && (
+        <section className="card">
+          <h3 style={{ marginTop: 0 }}>
+            {rubric.title} <span className="muted small">— your own, not shared</span>
+          </h3>
+          <p className="card-sub">{rubric.intro}</p>
+          <RubricTable rubric={rubric} scores={scores} onScore={setScore} />
+        </section>
+      )}
 
       <section className="card">
-        <h3 style={{ marginTop: 0 }}>Verdict</h3>
+        <h3 style={{ marginTop: 0 }}>
+          Your verdict <span className="muted small">— your own, not shared</span>
+        </h3>
         <div className="seg">
           {VERDICTS.map((v) => (
             <button
@@ -177,22 +214,54 @@ export default function InterviewGuideClient({ slot, script, report }) {
           </p>
         )}
       </section>
-    </div>
+    </>
+  );
+}
+
+/** The other interviewer's (or, for an admin just looking, both
+ * interviewers') scorecards — behind a reveal when `blind`, so filling in
+ * your own isn't influenced by seeing theirs first. */
+function TheirScorecards({ others, rubric, blind }) {
+  const [revealed, setRevealed] = useState(!blind);
+
+  if (!revealed) {
+    return (
+      <section className="card">
+        <button type="button" className="btn" onClick={() => setRevealed(true)}>
+          Show {others.map((o) => o.graderName).join(" and ")}'s scorecard
+        </button>
+      </section>
+    );
+  }
+
+  return (
+    <>
+      {others.map((card) => (
+        <section className="card" key={card.graderId}>
+          <h3 style={{ marginTop: 0 }}>{card.graderName}'s scorecard</h3>
+          {rubric && <RubricTable rubric={rubric} scores={card.rubric} readOnly />}
+          <p style={{ marginTop: 14 }}>
+            <strong>Verdict: </strong>
+            {VERDICTS.find((v) => v.value === card.verdict)?.label || "Not set yet"}
+          </p>
+          {card.generalNotes && <p className="ig-guidance">{card.generalNotes}</p>}
+        </section>
+      ))}
+    </>
   );
 }
 
 /** The scoring table: pick 1-5 per category (5/3/1 are described; 4/2 are
  * the in-between scores the rubric says to use for answers that fall
- * between them), and the total/average build up as scores go in. */
-function Rubric({ rubric, scores, onScore }) {
+ * between them), and the total/average build up as scores go in. Read-only
+ * for someone else's revealed scorecard. */
+function RubricTable({ rubric, scores, onScore, readOnly = false }) {
   const filled = rubric.categories.filter((c) => scores[c.id]);
   const total = filled.reduce((sum, c) => sum + scores[c.id], 0);
   const max = rubric.categories.length * 5;
 
   return (
-    <section className="card">
-      <h3 style={{ marginTop: 0 }}>{rubric.title}</h3>
-      <p className="card-sub">{rubric.intro}</p>
+    <>
       <div className="ig-rubric">
         {rubric.categories.map((cat) => (
           <div className="ig-rubric-row" key={cat.id}>
@@ -205,6 +274,7 @@ function Rubric({ rubric, scores, onScore }) {
                 <button
                   key={n}
                   type="button"
+                  disabled={readOnly}
                   className={`ig-rubric-cell${scores[cat.id] === n ? " on" : ""}`}
                   onClick={() => onScore(cat.id, n)}
                 >
@@ -222,7 +292,7 @@ function Rubric({ rubric, scores, onScore }) {
           <> · Average <strong>{(total / filled.length).toFixed(1)}</strong></>
         )}
       </p>
-    </section>
+    </>
   );
 }
 

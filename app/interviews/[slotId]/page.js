@@ -23,6 +23,7 @@ export default async function InterviewGuidePage({ params }) {
       interviewer1: { select: { id: true, name: true } },
       interviewer2: { select: { id: true, name: true } },
       report: true,
+      scorecards: { include: { grader: { select: { name: true } } } },
     },
   });
   if (!slot) redirect("/interviews");
@@ -32,14 +33,30 @@ export default async function InterviewGuidePage({ params }) {
 
   const script = scriptFor(slot.roleRaw);
   const report = slot.report
-    ? {
-        track: slot.report.track,
-        notes: JSON.parse(slot.report.notesJson || "{}"),
-        rubric: JSON.parse(slot.report.rubricJson || "{}"),
-        verdict: slot.report.verdict,
-        generalNotes: slot.report.generalNotes || "",
+    ? { track: slot.report.track, notes: JSON.parse(slot.report.notesJson || "{}") }
+    : { track: null, notes: {} };
+
+  const cards = slot.scorecards.map((s) => ({
+    graderId: s.graderId,
+    graderName: s.grader.name,
+    rubric: JSON.parse(s.rubricJson || "{}"),
+    verdict: s.verdict,
+    generalNotes: s.generalNotes || "",
+  }));
+  // Your own scorecard, to fill in — only if you're actually one of the two
+  // interviewers. Everyone else's (just the one other interviewer, in
+  // practice) stays out of sight until asked for, so filling yours in isn't
+  // influenced by seeing theirs first.
+  const mine = isInterviewer
+    ? cards.find((c) => c.graderId === grader.id) || {
+        graderId: grader.id,
+        graderName: grader.name,
+        rubric: {},
+        verdict: null,
+        generalNotes: "",
       }
-    : { track: null, notes: {}, rubric: {}, verdict: null, generalNotes: "" };
+    : null;
+  const others = cards.filter((c) => c.graderId !== grader.id);
 
   return (
     <>
@@ -59,6 +76,8 @@ export default async function InterviewGuidePage({ params }) {
         }}
         script={script}
         report={report}
+        mine={mine}
+        others={others}
       />
     </>
   );
