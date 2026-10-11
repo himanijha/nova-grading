@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import GroupBadge from "../GroupBadge";
 import { Mugshot } from "../Mugshot";
 import { VERDICTS, verdictMeta } from "@/lib/deliberation";
@@ -29,6 +29,7 @@ async function saveRanking(body) {
  */
 export default function DeliberationsClient({ queue, people, ranking, isAdmin }) {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const [groupIdx, setGroupIdx] = useState(0);
   const [selectedId, setSelectedId] = useState(null);
   // The ranking as shown. Changes land here at once and are saved behind; the
@@ -71,6 +72,13 @@ export default function DeliberationsClient({ queue, people, ranking, isAdmin })
     setSelectedId(id);
     if (groupOf[id] !== undefined) setGroupIdx(groupOf[id]);
   }
+
+  // Arriving from a link ("see their deliberation profile"): open straight
+  // to their group and card.
+  const focusId = searchParams.get("focus");
+  useEffect(() => {
+    if (focusId && groupOf[focusId] !== undefined) select(focusId);
+  }, [focusId, groupOf]);
 
   // The next person after `fromId`, in queue order, who has no verdict yet.
   function nextUnrated(fromId) {
