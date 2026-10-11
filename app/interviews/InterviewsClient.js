@@ -58,6 +58,7 @@ export default function InterviewsClient({ isAdmin }) {
 
   const byDay = new Map();
   for (const slot of data.slots) {
+    if (!slot.candidateRaw) continue;
     if (!byDay.has(slot.day)) byDay.set(slot.day, []);
     byDay.get(slot.day).push(slot);
   }
@@ -74,7 +75,7 @@ export default function InterviewsClient({ isAdmin }) {
 
       {isAdmin && <SheetSettings sheetUrl={data.sheetUrl} onChange={load} />}
 
-      {data.slots.length === 0 && <p className="muted">No interview slots yet.</p>}
+      {byDay.size === 0 && <p className="muted">No interview slots yet.</p>}
 
       {[...byDay.entries()].map(([day, slots]) => (
         <section className="card" key={day}>
