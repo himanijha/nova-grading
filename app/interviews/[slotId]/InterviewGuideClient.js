@@ -129,7 +129,7 @@ export default function InterviewGuideClient({ slot, script, report, mine, other
 
       {mine && <Scorecard key={mine.graderId} slotId={slot.id} rubric={script.rubric} card={mine} />}
 
-      {others.length > 0 && <TheirScorecards others={others} rubric={script.rubric} blind={!!mine} />}
+      {others.length > 0 && <TheirScorecards others={others} rubric={script.rubric} />}
     </div>
   );
 }
@@ -173,7 +173,7 @@ function Scorecard({ slotId, rubric, card }) {
       {rubric && (
         <section className="card">
           <h3 style={{ marginTop: 0 }}>
-            {rubric.title} <span className="muted small">— your own, not shared</span>
+            {rubric.title} <span className="muted small">— yours to edit</span>
           </h3>
           <p className="card-sub">{rubric.intro}</p>
           <RubricTable rubric={rubric} scores={scores} onScore={setScore} />
@@ -182,7 +182,7 @@ function Scorecard({ slotId, rubric, card }) {
 
       <section className="card">
         <h3 style={{ marginTop: 0 }}>
-          Your verdict <span className="muted small">— your own, not shared</span>
+          Your verdict <span className="muted small">— yours to edit</span>
         </h3>
         <div className="seg">
           {VERDICTS.map((v) => (
@@ -218,22 +218,9 @@ function Scorecard({ slotId, rubric, card }) {
   );
 }
 
-/** The other interviewer's (or, for an admin just looking, both
- * interviewers') scorecards — behind a reveal when `blind`, so filling in
- * your own isn't influenced by seeing theirs first. */
-function TheirScorecards({ others, rubric, blind }) {
-  const [revealed, setRevealed] = useState(!blind);
-
-  if (!revealed) {
-    return (
-      <section className="card">
-        <button type="button" className="btn" onClick={() => setRevealed(true)}>
-          Show {others.map((o) => o.graderName).join(" and ")}'s scorecard
-        </button>
-      </section>
-    );
-  }
-
+/** Every other grader's scorecard for this slot, labeled by name so anyone
+ * viewing the guide can compare rubric scores and general thoughts. */
+function TheirScorecards({ others, rubric }) {
   return (
     <>
       {others.map((card) => (

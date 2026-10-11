@@ -41,8 +41,8 @@ export default async function InterviewGuidePage({ params }) {
     verdict: s.verdict,
     generalNotes: s.generalNotes || "",
   }));
-  // Your own scorecard, to fill in. Everyone else's stays out of sight until
-  // asked for, so filling yours in isn't influenced by seeing theirs first.
+  // Your own scorecard, to fill in. Everyone else's is shown read-only, right
+  // alongside it.
   const mine = cards.find((c) => c.graderId === grader.id) || {
     graderId: grader.id,
     graderName: grader.name,

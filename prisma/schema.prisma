@@ -497,10 +497,9 @@ model InterviewReport {
   updatedAt   DateTime      @updatedAt
 }
 
-// One interviewer's own rubric scores, verdict and explanation for a slot —
-// deliberately not shared, so one interviewer never sees or influences the
-// other's score while scoring. The guide reveals the other's scorecard only
-// once you ask to see it.
+// One interviewer's own rubric scores, verdict and explanation for a slot.
+// Only its own grader can edit it, but the guide shows every grader's
+// scorecard for a slot to anyone viewing it, labeled by grader name.
 model InterviewScorecard {
   id           String        @id @default(cuid())
   slotId       String
