@@ -210,7 +210,6 @@ function CandidateName({ id, name, raw }) {
       {open && (
         <div className="name-menu-popup" onClick={(e) => e.stopPropagation()}>
           <Link href={`/grading?id=${id}`}>Application</Link>
-          <Link href={`/interview-selection?focus=${id}`}>Coffee chat</Link>
           <Link href={`/deliberations?focus=${id}`}>Deliberations</Link>
         </div>
       )}
