@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import Link from "next/link";
 import NoteList from "../NoteList";
 
 const POLL_MS = 25000;
@@ -166,7 +167,7 @@ function SlotRow({ slot, isAdmin, open, onToggle, onChange }) {
         </td>
         <td>{slot.room}</td>
         <td>
-          <Named name={slot.candidateName} raw={slot.candidateRaw} />
+          <CandidateName id={slot.candidateId} name={slot.candidateName} raw={slot.candidateRaw} />
         </td>
         <td>
           <Named name={slot.interviewer1Name} raw={slot.interviewer1Raw} />
@@ -192,6 +193,44 @@ function Named({ name, raw }) {
   if (name) return <>{name}</>;
   if (!raw) return <span className="muted">—</span>;
   return <span className="warn-text">{raw}</span>;
+}
+
+/** A matched candidate's name, clickable to their application and coffee chat page. */
+function CandidateName({ id, name, raw }) {
+  const [open, setOpen] = useState(false);
+  const ref = useRef(null);
+
+  useEffect(() => {
+    if (!open) return;
+    const onDown = (e) => {
+      if (!ref.current?.contains(e.target)) setOpen(false);
+    };
+    document.addEventListener("mousedown", onDown);
+    return () => document.removeEventListener("mousedown", onDown);
+  }, [open]);
+
+  if (!id) return <Named name={name} raw={raw} />;
+  return (
+    <span className="name-menu" ref={ref}>
+      <button
+        type="button"
+        className="name-menu-btn"
+        aria-expanded={open}
+        onClick={(e) => {
+          e.stopPropagation();
+          setOpen((o) => !o);
+        }}
+      >
+        {name}
+      </button>
+      {open && (
+        <div className="name-menu-popup" onClick={(e) => e.stopPropagation()}>
+          <Link href={`/grading?id=${id}`}>Application</Link>
+          <Link href={`/interview-selection?focus=${id}`}>Coffee chat</Link>
+        </div>
+      )}
+    </span>
+  );
 }
 
 function SlotNotes({ slot, isAdmin, onChange }) {
