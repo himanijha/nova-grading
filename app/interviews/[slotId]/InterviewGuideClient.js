@@ -4,6 +4,11 @@ import { useState } from "react";
 import Link from "next/link";
 import { TRACKS, VERDICTS } from "@/lib/interviewScripts";
 
+function renderBold(text) {
+  const parts = text.split(/\*\*(.+?)\*\*/g);
+  return parts.map((part, i) => (i % 2 === 1 ? <strong key={i}>{part}</strong> : part));
+}
+
 async function post(url, body) {
   const res = await fetch(url, {
     method: "POST",
@@ -112,7 +117,7 @@ export default function InterviewGuideClient({ slot, script, report, mine, other
             (section.type === "info" ? (
               <ul className="ig-bullets">
                 {section.bullets.map((b, i) => (
-                  <li key={i}>{b}</li>
+                  <li key={i}>{renderBold(b)}</li>
                 ))}
               </ul>
             ) : (
