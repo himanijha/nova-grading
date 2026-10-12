@@ -187,30 +187,32 @@ up a mail provider is worth it.
 
 ## Deploying
 
-Graders should get a URL, not a checkout. **Vercel + Neon** is the path this
-project is built for: photos live in the database rather than on disk, so there
-is no file storage to provision.
+Graders should get a URL, not a checkout. **Vercel + Supabase** is the path
+this project is built for: photos live in the database rather than on disk, so
+there is no file storage to provision.
 
 ### 1. Database
 
-Create a project at **neon.com**. It gives you two connection strings — you need
-both, and they are not interchangeable:
+Create a project at **supabase.com**. Under Project Settings → Database →
+Connection string, it gives you the same credentials on two different ports —
+you need both, and they are not interchangeable:
 
-- the **pooled** one (`-pooler` in the hostname) → the app's `DATABASE_URL`
-- the **direct** one → migrations only
+- port **6543** (Supavisor, Transaction mode) → the app's `DATABASE_URL`
+- port **5432** (Supavisor, Session mode) → migrations only
 
 Prisma opens a connection per serverless instance, so the app must use the
-pooled string or a handful of simultaneous graders will exhaust the database's
-connection limit. Migrations must use the direct string, because pgbouncer
-cannot run them.
+transaction-mode (6543) string or a handful of simultaneous graders will
+exhaust the database's connection limit. Migrations must use the session-mode
+(5432) string, because the transaction pooler doesn't support the prepared
+statements Prisma's migration runner needs.
 
 ### 2. Create the tables and your admin account
 
 From your laptop, pointed at production:
 
 ```bash
-DATABASE_URL="<direct-url>" npx prisma migrate deploy
-DATABASE_URL="<direct-url>" npm run seed -- "Your Name" you@ucla.edu your-password
+DATABASE_URL="<session-mode, port 5432, url>" npx prisma migrate deploy
+DATABASE_URL="<session-mode, port 5432, url>" npm run seed -- "Your Name" you@ucla.edu your-password
 ```
 
 ### 3. Deploy
@@ -218,10 +220,10 @@ DATABASE_URL="<direct-url>" npm run seed -- "Your Name" you@ucla.edu your-passwo
 Push to GitHub, import the repo at **vercel.com**, and set two environment
 variables:
 
-| Variable         | Value                                        |
-| ---------------- | -------------------------------------------- |
-| `DATABASE_URL`   | the **pooled** Neon string                    |
-| `SESSION_SECRET` | 32+ random characters (command below)         |
+| Variable         | Value                                                  |
+| ---------------- | ------------------------------------------------------- |
+| `DATABASE_URL`   | the **transaction-mode (port 6543)** Supabase string    |
+| `SESSION_SECRET` | 32+ random characters (command below)                   |
 
 ```bash
 node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"
