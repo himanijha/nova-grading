@@ -195,6 +195,11 @@ textarea.inp { resize: vertical; min-height: 58px; }
   margin: 0 0 16px;
   font-size: 17px;
 }
+
+.ig-group-intro { background: #f3f1fb; border-left: 4px solid #8b7cd8; }
+.ig-group-behavioral { background: #eef6fb; border-left: 4px solid #5aa9d6; }
+.ig-group-technical { background: #f0f8f1; border-left: 4px solid #5fb37a; }
+.ig-group-wrapup { background: #fbf4ec; border-left: 4px solid #d6a05a; }
 .section-title {
   font-size: 17px;
   font-weight: 600;

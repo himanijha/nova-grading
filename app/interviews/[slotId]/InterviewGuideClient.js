@@ -9,6 +9,20 @@ function renderBold(text) {
   return parts.map((part, i) => (i % 2 === 1 ? <strong key={i}>{part}</strong> : part));
 }
 
+const SECTION_GROUPS = {
+  before: "intro",
+  timing: "intro",
+  intros: "intro",
+  general: "behavioral",
+  "wrap-up": "wrapup",
+  "wrap-up-closing": "wrapup",
+  after: "wrapup",
+};
+
+function groupFor(key) {
+  return SECTION_GROUPS[key] || "technical";
+}
+
 async function post(url, body) {
   const res = await fetch(url, {
     method: "POST",
@@ -51,6 +65,17 @@ export default function InterviewGuideClient({ slot, script, report, mine, other
   function onTrackChange(value) {
     setTrack(value);
     saveReport({ track: value });
+    // Collapse the non-matching track's section so it's out of the way, but
+    // still clickable to expand — those questions stay useful either way.
+    if (value) {
+      setOpen((prev) => {
+        const next = new Set(prev);
+        script.sections.forEach((s) => {
+          if (s.track && s.track !== value) next.delete(s.key);
+        });
+        return next;
+      });
+    }
   }
 
   function onNoteBlur(id, value) {
@@ -89,7 +114,7 @@ export default function InterviewGuideClient({ slot, script, report, mine, other
         <div className="map-row">
           <span className="lbl">Candidate track</span>
           <select className="inp" value={track} onChange={(e) => onTrackChange(e.target.value)}>
-            <option value="">Pick once you know — unlocks the matching questions</option>
+            <option value="">Pick once you know — collapses the other track's questions</option>
             {TRACKS.map((t) => (
               <option key={t.value} value={t.value}>
                 {t.label}
@@ -100,7 +125,7 @@ export default function InterviewGuideClient({ slot, script, report, mine, other
       </section>
 
       {script.sections.map((section) => (
-        <section className="card" key={section.key}>
+        <section className={`card ig-group-${groupFor(section.key)}`} key={section.key}>
           <button
             type="button"
             className="ig-section-head"
@@ -142,7 +167,10 @@ export default function InterviewGuideClient({ slot, script, report, mine, other
                 )}
               </>
             ) : (
-              <ItemList items={section.items} track={track} notes={notes} onNoteBlur={onNoteBlur} />
+              <>
+                {section.note && <p className="ig-guidance">{section.note}</p>}
+                <ItemList items={section.items} notes={notes} onNoteBlur={onNoteBlur} />
+              </>
             ))}
         </section>
       ))}
@@ -309,14 +337,10 @@ function RubricTable({ rubric, scores, onScore, readOnly = false }) {
   );
 }
 
-function ItemList({ items, track, notes, onNoteBlur }) {
-  const shown = items.filter((item) => !item.track || item.track === track);
-  if (shown.length === 0) {
-    return <p className="muted small">Pick a track above to see these questions.</p>;
-  }
+function ItemList({ items, notes, onNoteBlur }) {
   return (
     <div className="ig-items">
-      {shown.map((item) => (
+      {items.map((item) => (
         <div className="ig-item" key={item.id}>
           <div className="ig-prompt">{item.prompt}</div>
           {item.guidance?.map((g, i) => (
