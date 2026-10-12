@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { TRACKS, VERDICTS } from "@/lib/interviewScripts";
+import { TRACKS, VERDICTS, ROLE_CATEGORIES, scriptForCategory } from "@/lib/interviewScripts";
 
 function renderBold(text) {
   const parts = text.split(/\*\*(.+?)\*\*/g);
@@ -42,9 +42,12 @@ async function post(url, body) {
  *   ("mine"); everyone else's scorecard is shown read-only, labeled by name
  *   ("others") — including both of theirs, for a grader who isn't assigned.
  */
-export default function InterviewGuideClient({ slot, script, report, mine, others }) {
+export default function InterviewGuideClient({ slot, autoCategory, report, mine, others }) {
   const [track, setTrack] = useState(report.track || "");
   const [notes, setNotes] = useState(report.notes || {});
+  const [categoryOverride, setCategoryOverride] = useState(report.scriptOverride || "");
+  const category = categoryOverride || autoCategory;
+  const script = scriptForCategory(category);
   const [open, setOpen] = useState(() => new Set(script.sections.map((s) => s.key)));
   const [reportStatus, setReportStatus] = useState("");
 
@@ -76,6 +79,12 @@ export default function InterviewGuideClient({ slot, script, report, mine, other
         return next;
       });
     }
+  }
+
+  function onCategoryChange(value) {
+    setCategoryOverride(value);
+    setOpen(new Set(scriptForCategory(value || autoCategory).sections.map((s) => s.key)));
+    saveReport({ scriptOverride: value || null });
   }
 
   function onNoteBlur(id, value) {
@@ -111,6 +120,19 @@ export default function InterviewGuideClient({ slot, script, report, mine, other
         <h2 style={{ marginTop: 0 }}>{script.title}</h2>
         <p className="card-sub">{script.subtitle}</p>
         <p className="muted small">Shared between both of you — either can edit.</p>
+        <div className="map-row">
+          <span className="lbl">Interview type</span>
+          <select className="inp" value={categoryOverride} onChange={(e) => onCategoryChange(e.target.value)}>
+            <option value="">
+              Auto, from Role(s) ({ROLE_CATEGORIES.find((c) => c.value === autoCategory)?.label})
+            </option>
+            {ROLE_CATEGORIES.map((c) => (
+              <option key={c.value} value={c.value}>
+                {c.label}
+              </option>
+            ))}
+          </select>
+        </div>
         <div className="map-row">
           <span className="lbl">Candidate track</span>
           <select className="inp" value={track} onChange={(e) => onTrackChange(e.target.value)}>
