@@ -89,6 +89,7 @@ model Applicant {
   placements    Placement[]
   notes         Note[]
   deliberation  DeliberationVerdict?
+  interviewDeliberation InterviewDeliberationVerdict?
   interviewSlots InterviewSlot[]
 
   @@index([roleCategory])
@@ -395,6 +396,22 @@ model DeliberationVerdict {
   passedToInterview Boolean @default(false)
   updatedById String?
   updatedBy   Grader?   @relation("VerdictEdits", fields: [updatedById], references: [id], onDelete: SetNull)
+  updatedAt   DateTime  @updatedAt
+
+  @@index([position])
+}
+
+// The final-interview deliberations board. Unlike DeliberationVerdict, the
+// bucket a candidate sits in (strong accept / soft yes / maybe / no) and
+// their score are computed from their InterviewScorecards, not set by hand —
+// this table only remembers manual drag order within a bucket. A row exists
+// for every candidate with at least one interview verdict in, and is dropped
+// once they have none (see lib/interviewDeliberation.js).
+model InterviewDeliberationVerdict {
+  id          String    @id @default(cuid())
+  applicantId String    @unique
+  applicant   Applicant @relation(fields: [applicantId], references: [id], onDelete: Cascade)
+  position    Int
   updatedAt   DateTime  @updatedAt
 
   @@index([position])

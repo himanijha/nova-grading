@@ -58,7 +58,10 @@ function navGroups(grader) {
     {
       key: "interviews",
       label: "Interviews",
-      items: [{ href: "/interviews", label: "Schedule" }],
+      items: [
+        { href: "/interviews", label: "Schedule" },
+        { href: "/interview-deliberations", label: "Deliberations" },
+      ],
     },
   ].filter((g) => !g.hidden);
 }

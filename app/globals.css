@@ -1649,6 +1649,20 @@ input.inp.big { font-size: 17px; padding: 14px 16px; border-radius: 12px; backgr
 .ic-notes { display: grid; gap: 8px; margin-top: 8px; font-size: 14px; }
 .ic-notes .delib-item { white-space: pre-wrap; }
 
+/* Interview deliberations: same column layout as coffee chats, four buckets
+   instead of three role columns. */
+.id-cols { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+@media (max-width: 1300px) { .id-cols { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media (max-width: 700px) { .id-cols { grid-template-columns: 1fr; } }
+.ic-col.v-strong-accept { border-top: 3px solid var(--good); }
+.ic-col.v-soft-yes { border-top: 3px solid var(--good); }
+.ic-col.v-maybe { border-top: 3px solid var(--warn); }
+.ic-col.v-no { border-top: 3px solid var(--danger); }
+.id-row { display: flex; align-items: center; gap: 8px; }
+.id-row .ic-who { flex: 1; }
+.id-score { font-variant-numeric: tabular-nums; font-weight: 600; color: var(--ink); min-width: 28px; text-align: right; }
+.id-breakdown { display: grid; gap: 4px; margin-bottom: 4px; }
+
 /* ---------- interview guide ---------- */
 .ig-section-head {
   display: flex;
