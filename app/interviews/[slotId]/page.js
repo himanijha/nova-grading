@@ -1,17 +1,16 @@
 import { redirect } from "next/navigation";
 import { getCurrentGrader } from "@/lib/auth";
 import { prisma } from "@/lib/db";
-import { categoryFor } from "@/lib/interviewScripts";
+import { scriptFor } from "@/lib/interviewScripts";
 import Nav from "../../Nav";
 import InterviewGuideClient from "./InterviewGuideClient";
 
 export const dynamic = "force-dynamic";
 
 /** The interview guide for one slot: the dev or design script, picked by its
- * Role(s) text by default but switchable to any of the four categories, with
- * a place to jot notes and record a verdict. Any signed-in grader can open
- * it, but only the two assigned interviewers get an editable scorecard —
- * anyone else just sees everyone's scorecards read-only. */
+ * Role(s) text, with a place to jot notes and record a verdict. Any signed-in
+ * grader can open it, but only the two assigned interviewers get an editable
+ * scorecard — anyone else just sees everyone's scorecards read-only. */
 export default async function InterviewGuidePage({ params }) {
   const grader = await getCurrentGrader();
   if (!grader) redirect("/login");
@@ -29,14 +28,10 @@ export default async function InterviewGuidePage({ params }) {
   });
   if (!slot) redirect("/interviews");
 
-  const autoCategory = categoryFor(slot.roleRaw);
+  const script = scriptFor(slot.roleRaw);
   const report = slot.report
-    ? {
-        track: slot.report.track,
-        notes: JSON.parse(slot.report.notesJson || "{}"),
-        scriptOverride: slot.report.scriptOverride || null,
-      }
-    : { track: null, notes: {}, scriptOverride: null };
+    ? { track: slot.report.track, notes: JSON.parse(slot.report.notesJson || "{}") }
+    : { track: null, notes: {} };
 
   const cards = slot.scorecards.map((s) => ({
     graderId: s.graderId,
@@ -75,7 +70,7 @@ export default async function InterviewGuidePage({ params }) {
           interviewer1Name: slot.interviewer1?.name || slot.interviewer1Raw,
           interviewer2Name: slot.interviewer2?.name || slot.interviewer2Raw,
         }}
-        autoCategory={autoCategory}
+        script={script}
         report={report}
         mine={mine}
         others={others}

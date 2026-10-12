@@ -491,7 +491,6 @@ model InterviewReport {
   slotId      String        @unique
   slot        InterviewSlot @relation(fields: [slotId], references: [id], onDelete: Cascade)
   track       String? // NEW | EXPERIENCED
-  scriptOverride String? // dev | design | dev-pm | design-pm — overrides the role-based auto pick
   notesJson   String        @default("{}")
   updatedById String?
   updatedBy   Grader?       @relation(fields: [updatedById], references: [id], onDelete: SetNull)
