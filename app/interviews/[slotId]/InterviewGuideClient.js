@@ -115,20 +115,32 @@ export default function InterviewGuideClient({ slot, script, report, mine, other
 
           {open.has(section.key) &&
             (section.type === "info" ? (
-              <ul className="ig-bullets">
-                {section.bullets.map((b, i) =>
-                  typeof b === "string" ? (
-                    <li key={i}>{renderBold(b)}</li>
-                  ) : (
-                    <li key={i} className="ig-bullet-callout">
-                      {b.important && <div className="ig-bullet-callout-label">Very important</div>}
-                      {b.lines.map((line, j) => (
-                        <div key={j}>{renderBold(line)}</div>
-                      ))}
-                    </li>
-                  )
+              <>
+                <ul className="ig-bullets">
+                  {section.bullets.map((b, i) =>
+                    typeof b === "string" ? (
+                      <li key={i}>{renderBold(b)}</li>
+                    ) : (
+                      <li key={i} className="ig-bullet-callout">
+                        {b.important && <div className="ig-bullet-callout-label">Very important</div>}
+                        {b.lines.map((line, j) => (
+                          <div key={j}>{renderBold(line)}</div>
+                        ))}
+                      </li>
+                    )
+                  )}
+                </ul>
+                {section.noteKey && (
+                  <textarea
+                    className="inp"
+                    rows={2}
+                    style={{ marginTop: 10 }}
+                    defaultValue={notes[section.noteKey] || ""}
+                    onBlur={(e) => onNoteBlur(section.noteKey, e.target.value)}
+                    placeholder="Notes…"
+                  />
                 )}
-              </ul>
+              </>
             ) : (
               <ItemList items={section.items} track={track} notes={notes} onNoteBlur={onNoteBlur} />
             ))}
