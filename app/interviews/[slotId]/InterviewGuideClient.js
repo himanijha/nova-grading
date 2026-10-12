@@ -116,9 +116,18 @@ export default function InterviewGuideClient({ slot, script, report, mine, other
           {open.has(section.key) &&
             (section.type === "info" ? (
               <ul className="ig-bullets">
-                {section.bullets.map((b, i) => (
-                  <li key={i}>{renderBold(b)}</li>
-                ))}
+                {section.bullets.map((b, i) =>
+                  typeof b === "string" ? (
+                    <li key={i}>{renderBold(b)}</li>
+                  ) : (
+                    <li key={i} className="ig-bullet-callout">
+                      {b.important && <div className="ig-bullet-callout-label">Very important</div>}
+                      {b.lines.map((line, j) => (
+                        <div key={j}>{renderBold(line)}</div>
+                      ))}
+                    </li>
+                  )
+                )}
               </ul>
             ) : (
               <ItemList items={section.items} track={track} notes={notes} onNoteBlur={onNoteBlur} />
