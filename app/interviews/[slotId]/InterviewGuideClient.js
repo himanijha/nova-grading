@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import Link from "next/link";
+import { Mugshot } from "../../Mugshot";
 import { TRACKS, VERDICTS, ROLE_CATEGORIES, scriptForCategory } from "@/lib/interviewScripts";
 
 function renderBold(text) {
@@ -100,21 +101,36 @@ export default function InterviewGuideClient({ slot, autoCategory, report, mine,
         ← Back to the schedule
       </Link>
 
-      <h1 style={{ marginTop: 10 }}>{slot.candidateName || "Interview"}</h1>
-      <p className="sub">
-        {slot.day} · {slot.startRaw}
-        {slot.endRaw ? `–${slot.endRaw}` : ""} · {slot.room} · {slot.roleRaw}
-        <br />
-        {slot.interviewer1Name || "—"} and {slot.interviewer2Name || "—"} interviewing
+      <div style={{ display: "flex", gap: 18, alignItems: "flex-start", marginTop: 10, flexWrap: "wrap" }}>
         {slot.candidateId && (
-          <>
-            {" · "}
-            <Link href={`/grading?id=${slot.candidateId}`} style={{ textDecoration: "underline" }}>
-              Application
-            </Link>
-          </>
+          <Mugshot
+            applicant={{
+              id: slot.candidateId,
+              fullName: slot.candidateName || "?",
+              hasPhoto: slot.candidateHasPhoto,
+              photoVersion: slot.candidatePhotoVersion,
+            }}
+            size={120}
+          />
         )}
-      </p>
+        <div>
+          <h1 style={{ marginTop: 0 }}>{slot.candidateName || "Interview"}</h1>
+          <p className="sub">
+            {slot.day} · {slot.startRaw}
+            {slot.endRaw ? `–${slot.endRaw}` : ""} · {slot.room} · {slot.roleRaw}
+            <br />
+            {slot.interviewer1Name || "—"} and {slot.interviewer2Name || "—"} interviewing
+            {slot.candidateId && (
+              <>
+                {" · "}
+                <Link href={`/grading?id=${slot.candidateId}`} style={{ textDecoration: "underline" }}>
+                  Application
+                </Link>
+              </>
+            )}
+          </p>
+        </div>
+      </div>
 
       <section className="card">
         <h2 style={{ marginTop: 0 }}>{script.title}</h2>

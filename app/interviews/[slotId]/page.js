@@ -20,7 +20,7 @@ export default async function InterviewGuidePage({ params }) {
   const slot = await prisma.interviewSlot.findUnique({
     where: { id: slotId },
     include: {
-      candidate: { select: { fullName: true } },
+      candidate: { select: { fullName: true, photo: { select: { updatedAt: true } } } },
       interviewer1: { select: { id: true, name: true } },
       interviewer2: { select: { id: true, name: true } },
       report: true,
@@ -72,6 +72,8 @@ export default async function InterviewGuidePage({ params }) {
           roleRaw: slot.roleRaw,
           candidateName: slot.candidate?.fullName || slot.candidateRaw,
           candidateId: slot.candidateId,
+          candidateHasPhoto: !!slot.candidate?.photo,
+          candidatePhotoVersion: slot.candidate?.photo ? slot.candidate.photo.updatedAt.getTime() : null,
           interviewer1Name: slot.interviewer1?.name || slot.interviewer1Raw,
           interviewer2Name: slot.interviewer2?.name || slot.interviewer2Raw,
         }}
