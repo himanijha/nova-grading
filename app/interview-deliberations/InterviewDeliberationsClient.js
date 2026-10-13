@@ -1,10 +1,11 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { Mugshot } from "../Mugshot";
-import { BUCKETS, SCORE_CATEGORIES, reorderWithin } from "@/lib/interviewDeliberation";
+import { BUCKETS, SCORE_CATEGORIES, passes, reorderWithin } from "@/lib/interviewDeliberation";
+import { COLUMNS } from "@/lib/deliberation";
 import { compareGradYears, gradYearParts } from "@/lib/mapping";
 
 const slug = (value) => value.toLowerCase().replace(/_/g, "-");
@@ -16,7 +17,7 @@ async function save(body) {
     body: JSON.stringify(body),
   });
   const data = await res.json().catch(() => ({}));
-  return res.ok ? { ok: true, order: data.order } : { ok: false, error: data.error || "Something went wrong." };
+  return res.ok ? { ok: true, ...data } : { ok: false, error: data.error || "Something went wrong." };
 }
 
 /**
@@ -28,7 +29,9 @@ async function save(body) {
 export default function InterviewDeliberationsClient({ order: initialOrder, people, isAdmin }) {
   const router = useRouter();
   const [order, setOrder] = useState(initialOrder);
+  useEffect(() => setOrder(initialOrder), [initialOrder]);
   const [years, setYears] = useState(Object.fromEntries(BUCKETS.map((b) => [b.key, "all"])));
+  const [roles, setRoles] = useState(Object.fromEntries(BUCKETS.map((b) => [b.key, "all"])));
   const [openId, setOpenId] = useState(null);
   const [drag, setDrag] = useState(null); // { id, column }
   const [dropAt, setDropAt] = useState(null); // { column, index }
@@ -42,15 +45,17 @@ export default function InterviewDeliberationsClient({ order: initialOrder, peop
 
   const inColumn = (key) => rows.filter((r) => r.bucket === key);
   const shownIn = (key) =>
-    years[key] === "all" ? inColumn(key) : inColumn(key).filter((r) => r.gradYear === years[key]);
+    inColumn(key)
+      .filter((r) => years[key] === "all" || r.gradYear === years[key])
+      .filter((r) => roles[key] === "all" || r.column === roles[key]);
 
   async function act(body) {
     setErr("");
     setBusy(true);
     const r = await save(body);
     setBusy(false);
-    if (r.ok) setOrder(r.order);
-    else setErr(r.error);
+    if (r.ok && r.order) setOrder(r.order);
+    if (!r.ok) setErr(r.error);
     router.refresh();
     return r.ok;
   }
@@ -78,7 +83,12 @@ export default function InterviewDeliberationsClient({ order: initialOrder, peop
     setDropAt(null);
   }
 
+  async function setOverride(applicantId, overrideBucket) {
+    await act({ applicantId, overrideBucket });
+  }
+
   const yearsAll = [...new Set(rows.map((r) => r.gradYear))].sort(compareGradYears);
+  const passingRows = rows.filter((r) => passes(r.bucket));
 
   return (
     <div className="page wide ic">
@@ -115,6 +125,25 @@ export default function InterviewDeliberationsClient({ order: initialOrder, peop
                 </span>
                 <span className="bd-val">
                   <strong>{count}</strong> / {rows.length}
+                </span>
+              </div>
+            );
+          })}
+        </div>
+
+        <div>
+          <div className="bd-title">Passing by role (strong accept + soft yes)</div>
+          {COLUMNS.map((c) => {
+            const total = rows.filter((r) => r.column === c.key).length;
+            const passed = passingRows.filter((r) => r.column === c.key).length;
+            return (
+              <div className="bd-row" key={c.key}>
+                <span className="bd-label">{c.label}</span>
+                <span className="bd-track">
+                  <span className="bd-fill" style={{ width: `${total ? (passed / total) * 100 : 0}%` }} />
+                </span>
+                <span className="bd-val">
+                  <strong>{passed}</strong> / {total}
                 </span>
               </div>
             );
@@ -172,19 +201,34 @@ export default function InterviewDeliberationsClient({ order: initialOrder, peop
                   <h3>
                     {b.icon} {b.label} <span className="muted">({members.length})</span>
                   </h3>
-                  <select
-                    className="inp"
-                    aria-label={`${b.label} graduation year`}
-                    value={years[b.key]}
-                    onChange={(e) => setYears({ ...years, [b.key]: e.target.value })}
-                  >
-                    <option value="all">All years</option>
-                    {yearOpts.map((y) => (
-                      <option key={y} value={y}>
-                        {gradYearParts(y).label}
-                      </option>
-                    ))}
-                  </select>
+                  <div className="id-filters">
+                    <select
+                      className="inp"
+                      aria-label={`${b.label} role`}
+                      value={roles[b.key]}
+                      onChange={(e) => setRoles({ ...roles, [b.key]: e.target.value })}
+                    >
+                      <option value="all">All roles</option>
+                      {COLUMNS.map((c) => (
+                        <option key={c.key} value={c.key}>
+                          {c.label}
+                        </option>
+                      ))}
+                    </select>
+                    <select
+                      className="inp"
+                      aria-label={`${b.label} graduation year`}
+                      value={years[b.key]}
+                      onChange={(e) => setYears({ ...years, [b.key]: e.target.value })}
+                    >
+                      <option value="all">All years</option>
+                      {yearOpts.map((y) => (
+                        <option key={y} value={y}>
+                          {gradYearParts(y).label}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
                 </div>
 
                 {shown.length === 0 ? (
@@ -236,6 +280,7 @@ export default function InterviewDeliberationsClient({ order: initialOrder, peop
                                 onClick={() => setOpenId(openId === r.id ? null : r.id)}
                               >
                                 {r.fullName}
+                                {r.overrideBucket && <span className="delib-flag">overridden</span>}
                               </button>
                               <span className="muted ic-year">{gradYearParts(r.gradYear).label}</span>
                             </div>
@@ -265,6 +310,27 @@ export default function InterviewDeliberationsClient({ order: initialOrder, peop
 
                           {openId === r.id && (
                             <div className="ic-notes">
+                              {isAdmin && (
+                                <div className="id-override">
+                                  <span className="muted small">Bucket</span>
+                                  <select
+                                    className="inp"
+                                    aria-label={`Override bucket for ${r.fullName}`}
+                                    value={r.overrideBucket || ""}
+                                    disabled={busy}
+                                    onChange={(e) => setOverride(r.id, e.target.value || null)}
+                                  >
+                                    <option value="">
+                                      Auto ({BUCKETS.find((x) => x.key === r.autoBucket)?.label})
+                                    </option>
+                                    {BUCKETS.map((x) => (
+                                      <option key={x.key} value={x.key}>
+                                        Override: {x.label}
+                                      </option>
+                                    ))}
+                                  </select>
+                                </div>
+                              )}
                               <div className="id-breakdown">
                                 {SCORE_CATEGORIES.map((c) => (
                                   <div className="bd-row" key={c.id}>

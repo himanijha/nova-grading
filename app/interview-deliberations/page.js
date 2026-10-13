@@ -2,6 +2,7 @@ import { redirect } from "next/navigation";
 import { getCurrentGrader } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import { summarizeScorecards, syncInterviewDeliberationOrder } from "@/lib/interviewDeliberation";
+import { columnFor } from "@/lib/deliberation";
 import { normalizeGradYear } from "@/lib/mapping";
 import { VERDICTS } from "@/lib/interviewScripts";
 import Nav from "../Nav";
@@ -32,6 +33,7 @@ export default async function InterviewDeliberationsPage() {
           fullName: true,
           gradYear: true,
           majors: true,
+          roleCategory: true,
           photo: { select: { updatedAt: true } },
         },
       },
@@ -64,11 +66,18 @@ export default async function InterviewDeliberationsPage() {
 
   const order = await syncInterviewDeliberationOrder(summaries);
 
+  const overrideRows = await prisma.interviewDeliberationVerdict.findMany({
+    where: { applicantId: { in: order } },
+    select: { applicantId: true, overrideBucket: true },
+  });
+  const overrides = new Map(overrideRows.map((r) => [r.applicantId, r.overrideBucket]));
+
   const people = Object.fromEntries(
     order.map((applicantId) => {
       const entry = byCandidate.get(applicantId);
       const summary = summaries.get(applicantId);
       const a = entry.candidate;
+      const overrideBucket = overrides.get(applicantId) || null;
       return [
         applicantId,
         {
@@ -76,10 +85,13 @@ export default async function InterviewDeliberationsPage() {
           fullName: a.fullName,
           gradYear: normalizeGradYear(a.gradYear) || "Unknown",
           majors: a.majors,
+          column: columnFor(a.roleCategory),
           hasPhoto: !!a.photo,
           photoVersion: a.photo ? a.photo.updatedAt.getTime() : null,
           slotId: entry.slotId,
-          bucket: summary.bucket,
+          bucket: overrideBucket || summary.bucket,
+          autoBucket: summary.bucket,
+          overrideBucket,
           score: summary.score,
           perCategory: summary.perCategory,
           scorecards: entry.scorecards

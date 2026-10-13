@@ -412,6 +412,10 @@ model InterviewDeliberationVerdict {
   applicantId String    @unique
   applicant   Applicant @relation(fields: [applicantId], references: [id], onDelete: Cascade)
   position    Int
+  // An admin's manual override of the bucket the scorecards would otherwise
+  // put someone in (STRONG_ACCEPT | SOFT_YES | MAYBE | NO). Null means go
+  // with whatever the scorecards say.
+  overrideBucket String?
   updatedAt   DateTime  @updatedAt
 
   @@index([position])
